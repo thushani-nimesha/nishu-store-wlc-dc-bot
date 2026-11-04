@@ -7,7 +7,8 @@ const {
   AttachmentBuilder, 
   ActionRowBuilder, 
   ButtonBuilder, 
-  ButtonStyle 
+  ButtonStyle,
+  StringSelectMenuBuilder
 } = require('discord.js');
 const express = require('express');
 const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
@@ -24,9 +25,8 @@ try {
   if (fs.existsSync(path.join(winFonts, 'segoeuib.ttf'))) {
     GlobalFonts.registerFromPath(path.join(winFonts, 'segoeuib.ttf'), 'SegoeUIBold');
   }
-  console.log('✅ Sleek fonts (Bahnschrift & Segoe UI Bold) registered successfully!');
 } catch (fontErr) {
-  console.warn('⚠️ Could not register custom fonts, defaulting to system sans-serif.');
+  console.warn('⚠️ Custom fonts notice: fallback to sans-serif.');
 }
 
 // --- 1. HEALTH CHECK WEB SERVER (For 24/7 Hosting) ---
@@ -34,7 +34,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.get('/', (req, res) => {
-  res.send({ status: 'online', bot: 'Discord Welcome & Verification Bot is active!' });
+  res.send({ status: 'online', bot: 'Nishu Store Bot is active!' });
 });
 
 app.listen(PORT, () => {
@@ -56,7 +56,6 @@ async function loadBackgroundFrames() {
       .filter(f => f.endsWith('.jpg') || f.endsWith('.png'))
       .sort();
     
-    console.log(`🌌 Preloading ${files.length} Galaxy video frames into memory...`);
     preloadedBgImages = await Promise.all(
       files.map(f => loadImage(path.join(BG_FRAMES_DIR, f)))
     );
@@ -242,14 +241,13 @@ async function generateAnimatedWelcomeCard(user, guild) {
   return encoder.out.getData();
 }
 
-// --- 3. GENERATE VISUAL CYBER CAPTCHA IMAGE ---
+// --- 3. GENERATE VISUAL CYBER CAPTCHA ---
 function generateCaptchaImage(code) {
   const width = 360;
   const height = 110;
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext('2d');
 
-  // Dark Cyber Background
   const grad = ctx.createLinearGradient(0, 0, width, height);
   grad.addColorStop(0, '#060610');
   grad.addColorStop(0.5, '#120f26');
@@ -257,7 +255,6 @@ function generateCaptchaImage(code) {
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, width, height);
 
-  // Random neon grid lines
   for (let i = 0; i < 6; i++) {
     ctx.strokeStyle = i % 2 === 0 ? 'rgba(0, 217, 255, 0.25)' : 'rgba(235, 69, 158, 0.25)';
     ctx.lineWidth = 1.5;
@@ -292,10 +289,8 @@ function generateCaptchaImage(code) {
   return canvas.toBuffer('image/png');
 }
 
-// In-memory cache for pending captchas: userId -> { code, timestamp }
 const pendingCaptchas = new Map();
 
-// Helper to generate 5-char alphanumeric code
 function randomCode() {
   const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
   let res = '';
@@ -316,37 +311,88 @@ const client = new Client({
 
 client.once('clientReady', async () => {
   console.log(`✅ Logged in as ${client.user.tag}!`);
-  client.user.setActivity('for new members 🛡️', { type: ActivityType.Watching });
+  client.user.setActivity('NISHU STORE 🚀', { type: ActivityType.Watching });
+
+  // Post or refresh permanent verification & role panel in #choose-your-roles
+  setupRolesChannelPanel();
 });
 
 client.once('ready', () => {
   console.log(`✅ Connected and ready as ${client.user.tag}!`);
 });
 
-// --- 5. WELCOME EVENT ---
+// Setup the main Role Selector & Verification panel in #choose-your-roles
+async function setupRolesChannelPanel() {
+  try {
+    const rolesChannelId = process.env.ROLES_CHANNEL_ID || '1566958208512163961';
+    const channel = client.channels.cache.get(rolesChannelId);
+    if (!channel) return;
+
+    // Check if we already posted to avoid duplicates
+    const messages = await channel.messages.fetch({ limit: 10 });
+    const botMsg = messages.find(m => m.author.id === client.user.id && m.embeds.length > 0 && m.embeds[0].title?.includes('CHOOSE YOUR ROLES'));
+    if (botMsg) {
+      console.log('📌 Verification & Role Panel already exists in #choose-your-roles.');
+      return;
+    }
+
+    const rolesEmbed = new EmbedBuilder()
+      .setColor(0x5865F2)
+      .setTitle('🎭 CHOOSE YOUR ROLES & GET VERIFIED')
+      .setDescription(
+        'Welcome to **NISHU STORE | PREMIUM DIGITAL**!\n\n' +
+        'To access all store categories, pricing, deals, and community channels:\n\n' +
+        '1️⃣ Click the **VERIFY & GET ROLES** button below.\n' +
+        '2️⃣ Complete the quick visual security scanner.\n' +
+        '3️⃣ Pick your community or customer roles to unlock channels!'
+      )
+      .addFields(
+        { name: '🌸 Community Member', value: 'Access general chat, giveaways, free resources & deals.', inline: true },
+        { name: '🛍️ Customer', value: 'Access store orders, receipts, support & buyer lounges.', inline: true }
+      )
+      .setFooter({ text: 'NISHU STORE • Automatic Role Gateway' })
+      .setTimestamp();
+
+    const actionRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('btn_open_role_verify')
+        .setLabel('VERIFY & GET ROLES')
+        .setStyle(ButtonStyle.Success)
+    );
+
+    await channel.send({ embeds: [rolesEmbed], components: [actionRow] });
+    console.log('✅ Posted interactive Role & Verification panel in #choose-your-roles');
+  } catch (err) {
+    console.error('Error in setupRolesChannelPanel:', err);
+  }
+}
+
+// --- 5. WELCOME EVENT (Clean Welcome in #welcome with direct link button) ---
 client.on('guildMemberAdd', async (member) => {
   try {
     const welcomeChannelId = process.env.WELCOME_CHANNEL_ID;
     const rulesChannelId = process.env.RULES_CHANNEL_ID;
+    const rolesChannelId = process.env.ROLES_CHANNEL_ID || '1566958208512163961';
 
     if (!welcomeChannelId) return;
     const channel = member.guild.channels.cache.get(welcomeChannelId);
     if (!channel) return;
 
+    // 1. Generate Animated Welcome Card
     const gifBuffer = await generateAnimatedWelcomeCard(member.user, member.guild);
     const gifAttachment = new AttachmentBuilder(gifBuffer, { name: 'welcome-card.gif' });
     const cleanTitleName = getCleanServerName(member.guild.name);
 
     const rulesNotice = rulesChannelId 
-      ? `📜 Please check out <#${rulesChannelId}> and verify below to unlock channels!` 
-      : '📜 Please follow the server rules and verify below to unlock channels!';
+      ? `📜 Please check out <#${rulesChannelId}> to get started!` 
+      : '📜 Please check out the server rules!';
 
     const descriptionText = [
-      `Hey ${member}, welcome to **${cleanTitleName}**!`,
+      `Hey ${member}, we are thrilled to have you here!`,
       '',
       rulesNotice,
       '',
-      '🔒 **Security Protection Active:** Click the button below to complete verification and unlock full access.'
+      `👉 Please head over to <#${rolesChannelId}> to verify and choose your roles to unlock channels!`
     ].join('\n');
 
     const welcomeEmbed = new EmbedBuilder()
@@ -358,71 +404,70 @@ client.on('guildMemberAdd', async (member) => {
         { name: '👥 Member #', value: `#${member.guild.memberCount}`, inline: true }
       )
       .setImage('attachment://welcome-card.gif')
-      .setFooter({ text: `Server: ${cleanTitleName} • Security Gateway`, iconURL: member.guild.iconURL() || undefined })
+      .setFooter({ text: `Server: ${cleanTitleName} • Welcome`, iconURL: member.guild.iconURL() || undefined })
       .setTimestamp();
 
-    // Verify Action Button
-    const verifyRow = new ActionRowBuilder().addComponents(
+    // Direct Link Button that takes the user straight to #choose-your-roles
+    const linkRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setCustomId('btn_start_verify')
-        .setLabel('🛡️ VERIFY NOW')
-        .setStyle(ButtonStyle.Success)
-        
+        .setLabel('🎭 CHOOSE YOUR ROLES')
+        .setStyle(ButtonStyle.Link)
+        .setURL(`https://discord.com/channels/${member.guild.id}/${rolesChannelId}`)
     );
 
     await channel.send({ 
-      content: `👋 Hey ${member}, welcome!`,
+      content: `👋 Hey ${member}, welcome to **${cleanTitleName}**!`,
       embeds: [welcomeEmbed], 
       files: [gifAttachment],
-      components: [verifyRow]
+      components: [linkRow]
     });
-    console.log(`📢 Welcomed ${member.user.tag} with verification button.`);
+    console.log(`📢 Welcomed ${member.user.tag} with direct link button to #choose-your-roles`);
+
+    // Direct Message (DM) to new member
+    try {
+      const dmEmbed = new EmbedBuilder()
+        .setColor(0x57F287)
+        .setTitle(`Welcome to ${cleanTitleName}! 👋`)
+        .setDescription(
+          `Hello ${member.user.username}! Welcome to our community.\n\n` +
+          `👉 Head over to <#${rolesChannelId}> in the server to verify yourself and pick your roles!`
+        )
+        .setThumbnail(member.guild.iconURL() || member.user.displayAvatarURL())
+        .setTimestamp();
+
+      await member.send({ embeds: [dmEmbed] });
+    } catch (dmErr) {}
   } catch (error) {
     console.error('❌ Error handling guildMemberAdd:', error);
   }
 });
 
-// --- 6. INTERACTION HANDLER (CYBER CAPTCHA VERIFICATION) ---
+// --- 6. INTERACTION HANDLER FOR #choose-your-roles ---
 client.on('interactionCreate', async (interaction) => {
-  if (!interaction.isButton()) return;
-
   try {
-    // 1. User clicks "VERIFY NOW"
-    if (interaction.customId === 'btn_start_verify') {
+    // 1. User clicks "VERIFY & GET ROLES" in #choose-your-roles
+    if (interaction.isButton() && interaction.customId === 'btn_open_role_verify') {
       await interaction.deferReply({ flags: 64 });
-      const verifiedRoleId = process.env.VERIFIED_ROLE_ID || '1566957216546684969';
-      
-      // Check if already verified
-      if (interaction.member.roles.cache.has(verifiedRoleId)) {
-        return interaction.reply({
-          content: '✅ **You are already verified!** You already have full access to NISHU STORE. 🚀',
-          ephemeral: true
-        });
-      }
 
       // Generate Captcha Code
       const correctCode = randomCode();
       pendingCaptchas.set(interaction.user.id, { code: correctCode, timestamp: Date.now() });
 
-      // Generate decoy options
       const options = [correctCode];
       while (options.length < 4) {
         const decoy = randomCode();
         if (!options.includes(decoy)) options.push(decoy);
       }
-      // Shuffle options
       options.sort(() => Math.random() - 0.5);
 
-      // Render Visual Captcha
       const captchaBuffer = generateCaptchaImage(correctCode);
       const captchaAttachment = new AttachmentBuilder(captchaBuffer, { name: 'cyber-captcha.png' });
 
-      // Create Cyber Choice Buttons
       const buttonRow = new ActionRowBuilder();
       options.forEach(opt => {
         buttonRow.addComponents(
           new ButtonBuilder()
-            .setCustomId(`verify_choice_${opt}`)
+            .setCustomId(`role_verify_${opt}`)
             .setLabel(opt)
             .setStyle(ButtonStyle.Primary)
         );
@@ -432,9 +477,9 @@ client.on('interactionCreate', async (interaction) => {
         .setColor(0x00D9FF)
         .setTitle('🛡️ NISHU STORE // SECURITY GATEWAY')
         .setDescription(
-          '**HUMAN VERIFICATION REQUIRED**\n\n' +
-          'To prevent spam bots and protect the server, please select the exact **5-character code** shown in the holographic scanner below.\n\n' +
-          '⏱️ *This verification expires in 2 minutes.*'
+          '**STEP 1: HUMAN SECURITY CHECK**\n\n' +
+          'Please select the exact **5-character code** shown in the holographic scanner below.\n\n' +
+          '⏱️ *Expires in 2 minutes.*'
         )
         .setImage('attachment://cyber-captcha.png')
         .setFooter({ text: 'Anti-Raid Visual Security • Click your matching code below' });
@@ -446,52 +491,89 @@ client.on('interactionCreate', async (interaction) => {
       });
     }
 
-    // 2. User selects a Captcha Code Button
-    if (interaction.customId.startsWith('verify_choice_')) {
-      const chosenCode = interaction.customId.replace('verify_choice_', '');
+    // 2. User selects Captcha Code Button
+    if (interaction.isButton() && interaction.customId.startsWith('role_verify_')) {
+      const chosenCode = interaction.customId.replace('role_verify_', '');
       const stored = pendingCaptchas.get(interaction.user.id);
 
       if (!stored) {
         return interaction.reply({
-          content: '⚠️ **Verification session expired.** Please click "VERIFY NOW" again.',
-          ephemeral: true
+          content: '⚠️ **Session expired.** Please click "VERIFY & GET ROLES" again.',
+          flags: 64
         });
       }
 
       if (chosenCode === stored.code) {
         pendingCaptchas.delete(interaction.user.id);
-        const verifiedRoleId = process.env.VERIFIED_ROLE_ID || '1566957216546684969';
 
+        // Auto grant COMMUNITY role
+        const communityRoleId = process.env.VERIFIED_ROLE_ID || '1566957216546684969';
         try {
-          await interaction.member.roles.add(verifiedRoleId);
-        } catch (roleErr) {
-          console.error('Role add error:', roleErr);
+          await interaction.member.roles.add(communityRoleId);
+        } catch (e) {
+          console.error('Role add error:', e);
         }
+
+        // STEP 2: Give Role Selector Dropdown
+        const roleMenu = new ActionRowBuilder().addComponents(
+          new StringSelectMenuBuilder()
+            .setCustomId('select_user_roles')
+            .setPlaceholder('🎭 Select your additional server roles...')
+            .setMinValues(0)
+            .setMaxValues(2)
+            .addOptions([
+              {
+                label: '🌸 COMMUNITY MEMBER',
+                description: 'Chat, participate in giveaways, community discussions',
+                value: '1566957216546684969',
+                default: true
+              },
+              {
+                label: '🛍️ CUSTOMER',
+                description: 'Customer lounge, order support & exclusive discounts',
+                value: '1566957024749551656'
+              }
+            ])
+        );
 
         const successEmbed = new EmbedBuilder()
           .setColor(0x57F287)
-          .setTitle('🔓 ACCESS GRANTED // VERIFIED!')
+          .setTitle('🔓 VERIFICATION SUCCESSFUL!')
           .setDescription(
-            `🎉 **Welcome to NISHU STORE, ${interaction.user}!**\n\n` +
-            '✅ You have successfully passed the human verification.\n' +
-            '🌸 Role **COMMUNITY** has been granted to your account.\n\n' +
-            '🚀 **All store channels, pricing, and chats are now unlocked!**'
+            `🎉 **Awesome, ${interaction.user}! You have passed the security verification.**\n\n` +
+            '✅ You have been granted access to NISHU STORE!\n\n' +
+            '👇 **Pick your role below** to customize your channel access:'
           )
-          .setFooter({ text: 'NISHU STORE • Verification Complete' })
-          .setTimestamp();
+          .setFooter({ text: 'NISHU STORE • Role Customization' });
 
         return interaction.update({
           embeds: [successEmbed],
-          components: [],
+          components: [roleMenu],
           files: []
         });
       } else {
-        // Wrong code clicked
         return interaction.reply({
-          content: '❌ **Incorrect Code!** Please try again by clicking "VERIFY NOW".',
-          ephemeral: true
+          content: '❌ **Incorrect code.** Please click "VERIFY & GET ROLES" to try again.',
+          flags: 64
         });
       }
+    }
+
+    // 3. User selects roles from Dropdown
+    if (interaction.isStringSelectMenu() && interaction.customId === 'select_user_roles') {
+      const selected = interaction.values;
+      const allAssignable = ['1566957216546684969', '1566957024749551656'];
+
+      for (const roleId of allAssignable) {
+        if (selected.includes(roleId)) {
+          await interaction.member.roles.add(roleId).catch(() => {});
+        }
+      }
+
+      return interaction.reply({
+        content: '✨ **Roles updated successfully!** Welcome to NISHU STORE. All channels have been unlocked for you! 🚀',
+        flags: 64
+      });
     }
   } catch (err) {
     console.error('Interaction error:', err);
