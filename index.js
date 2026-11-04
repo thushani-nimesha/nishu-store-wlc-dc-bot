@@ -26,7 +26,7 @@ try {
     GlobalFonts.registerFromPath(path.join(winFonts, 'segoeuib.ttf'), 'SegoeUIBold');
   }
 } catch (fontErr) {
-  console.warn('⚠️ Custom fonts notice: fallback to sans-serif.');
+  console.warn('⚠️ Font notice: fallback to sans-serif.');
 }
 
 // --- 1. HEALTH CHECK WEB SERVER (For 24/7 Hosting) ---
@@ -131,7 +131,7 @@ async function generateAnimatedWelcomeCard(user, guild) {
     ctx.stroke();
     ctx.restore();
 
-    // 3D Coin
+    // 3D Coin Spin
     if (Math.abs(coinScaleX) > 0.05) {
       ctx.save();
       ctx.translate(avatarX, avatarY);
@@ -313,7 +313,6 @@ client.once('clientReady', async () => {
   console.log(`✅ Logged in as ${client.user.tag}!`);
   client.user.setActivity('NISHU STORE 🚀', { type: ActivityType.Watching });
 
-  // Post or refresh permanent verification & role panel in #choose-your-roles
   setupRolesChannelPanel();
 });
 
@@ -321,16 +320,15 @@ client.once('ready', () => {
   console.log(`✅ Connected and ready as ${client.user.tag}!`);
 });
 
-// Setup the main Role Selector & Verification panel in #choose-your-roles
+// Setup Main Role & Security Panel in #choose-your-roles
 async function setupRolesChannelPanel() {
   try {
     const rolesChannelId = process.env.ROLES_CHANNEL_ID || '1566958208512163961';
     const channel = client.channels.cache.get(rolesChannelId);
     if (!channel) return;
 
-    // Check if we already posted to avoid duplicates
     const messages = await channel.messages.fetch({ limit: 10 });
-    const botMsg = messages.find(m => m.author.id === client.user.id && m.embeds.length > 0 && m.embeds[0].title?.includes('CHOOSE YOUR ROLES'));
+    const botMsg = messages.find(m => m.author.id === client.user.id && m.embeds.length > 0 && m.embeds[0].title?.includes('VERIFY & GET ROLES'));
     if (botMsg) {
       console.log('📌 Verification & Role Panel already exists in #choose-your-roles.');
       return;
@@ -338,36 +336,32 @@ async function setupRolesChannelPanel() {
 
     const rolesEmbed = new EmbedBuilder()
       .setColor(0x5865F2)
-      .setTitle('🎭 CHOOSE YOUR ROLES & GET VERIFIED')
+      .setTitle('🛡️ VERIFY & UNLOCK NISHU STORE')
       .setDescription(
         'Welcome to **NISHU STORE | PREMIUM DIGITAL**!\n\n' +
-        'To access all store categories, pricing, deals, and community channels:\n\n' +
-        '1️⃣ Click the **VERIFY & GET ROLES** button below.\n' +
-        '2️⃣ Complete the quick visual security scanner.\n' +
-        '3️⃣ Pick your community or customer roles to unlock channels!'
+        'To prevent spam bots and unlock server channels based on your membership, please verify yourself below:\n\n' +
+        '🌸 **COMMUNITY ACCESS**: Unlocks general chat, giveaways, free resources & community.\n' +
+        '🛍️ **CUSTOMER ACCESS**: Unlocks store categories, premium access, and support channels.\n\n' +
+        '👇 Click **VERIFY NOW** to complete the quick security check!'
       )
-      .addFields(
-        { name: '🌸 Community Member', value: 'Access general chat, giveaways, free resources & deals.', inline: true },
-        { name: '🛍️ Customer', value: 'Access store orders, receipts, support & buyer lounges.', inline: true }
-      )
-      .setFooter({ text: 'NISHU STORE • Automatic Role Gateway' })
+      .setFooter({ text: 'NISHU STORE • Security & Role Gateway' })
       .setTimestamp();
 
     const actionRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('btn_open_role_verify')
-        .setLabel('VERIFY & GET ROLES')
+        .setLabel('VERIFY NOW')
         .setStyle(ButtonStyle.Success)
     );
 
     await channel.send({ embeds: [rolesEmbed], components: [actionRow] });
-    console.log('✅ Posted interactive Role & Verification panel in #choose-your-roles');
+    console.log('✅ Posted clean Verification & Role panel in #choose-your-roles');
   } catch (err) {
     console.error('Error in setupRolesChannelPanel:', err);
   }
 }
 
-// --- 5. WELCOME EVENT (Clean Welcome in #welcome with direct link button) ---
+// --- 5. WELCOME EVENT (Clean Card in #welcome with direct link button) ---
 client.on('guildMemberAdd', async (member) => {
   try {
     const welcomeChannelId = process.env.WELCOME_CHANNEL_ID;
@@ -378,7 +372,6 @@ client.on('guildMemberAdd', async (member) => {
     const channel = member.guild.channels.cache.get(welcomeChannelId);
     if (!channel) return;
 
-    // 1. Generate Animated Welcome Card
     const gifBuffer = await generateAnimatedWelcomeCard(member.user, member.guild);
     const gifAttachment = new AttachmentBuilder(gifBuffer, { name: 'welcome-card.gif' });
     const cleanTitleName = getCleanServerName(member.guild.name);
@@ -392,7 +385,7 @@ client.on('guildMemberAdd', async (member) => {
       '',
       rulesNotice,
       '',
-      `👉 Please head over to <#${rolesChannelId}> to verify and choose your roles to unlock channels!`
+      `👉 Please head over to <#${rolesChannelId}> to verify and get your role to unlock channels!`
     ].join('\n');
 
     const welcomeEmbed = new EmbedBuilder()
@@ -407,7 +400,6 @@ client.on('guildMemberAdd', async (member) => {
       .setFooter({ text: `Server: ${cleanTitleName} • Welcome`, iconURL: member.guild.iconURL() || undefined })
       .setTimestamp();
 
-    // Direct Link Button that takes the user straight to #choose-your-roles
     const linkRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setLabel('🎭 CHOOSE YOUR ROLES')
@@ -421,16 +413,16 @@ client.on('guildMemberAdd', async (member) => {
       files: [gifAttachment],
       components: [linkRow]
     });
-    console.log(`📢 Welcomed ${member.user.tag} with direct link button to #choose-your-roles`);
+    console.log(`📢 Welcomed ${member.user.tag}`);
 
-    // Direct Message (DM) to new member
+    // Direct Message (DM)
     try {
       const dmEmbed = new EmbedBuilder()
         .setColor(0x57F287)
         .setTitle(`Welcome to ${cleanTitleName}! 👋`)
         .setDescription(
-          `Hello ${member.user.username}! Welcome to our community.\n\n` +
-          `👉 Head over to <#${rolesChannelId}> in the server to verify yourself and pick your roles!`
+          `Hello ${member.user.username}! Welcome to our store community.\n\n` +
+          `👉 Head over to <#${rolesChannelId}> in the server to verify yourself and unlock the channels!`
         )
         .setThumbnail(member.guild.iconURL() || member.user.displayAvatarURL())
         .setTimestamp();
@@ -445,11 +437,10 @@ client.on('guildMemberAdd', async (member) => {
 // --- 6. INTERACTION HANDLER FOR #choose-your-roles ---
 client.on('interactionCreate', async (interaction) => {
   try {
-    // 1. User clicks "VERIFY & GET ROLES" in #choose-your-roles
+    // 1. User clicks "VERIFY NOW" in #choose-your-roles
     if (interaction.isButton() && interaction.customId === 'btn_open_role_verify') {
       await interaction.deferReply({ flags: 64 });
 
-      // Generate Captcha Code
       const correctCode = randomCode();
       pendingCaptchas.set(interaction.user.id, { code: correctCode, timestamp: Date.now() });
 
@@ -477,8 +468,8 @@ client.on('interactionCreate', async (interaction) => {
         .setColor(0x00D9FF)
         .setTitle('🛡️ NISHU STORE // SECURITY GATEWAY')
         .setDescription(
-          '**STEP 1: HUMAN SECURITY CHECK**\n\n' +
-          'Please select the exact **5-character code** shown in the holographic scanner below.\n\n' +
+          '**HUMAN VERIFICATION SCANNER**\n\n' +
+          'Please select the exact **5-character code** shown in the holographic scanner below to unlock server channels.\n\n' +
           '⏱️ *Expires in 2 minutes.*'
         )
         .setImage('attachment://cyber-captcha.png')
@@ -498,7 +489,7 @@ client.on('interactionCreate', async (interaction) => {
 
       if (!stored) {
         return interaction.reply({
-          content: '⚠️ **Session expired.** Please click "VERIFY & GET ROLES" again.',
+          content: '⚠️ **Session expired.** Please click "VERIFY NOW" again.',
           flags: 64
         });
       }
@@ -506,7 +497,7 @@ client.on('interactionCreate', async (interaction) => {
       if (chosenCode === stored.code) {
         pendingCaptchas.delete(interaction.user.id);
 
-        // Auto grant COMMUNITY role
+        // Auto-assign COMMUNITY role (ID: 1566957216546684969)
         const communityRoleId = process.env.VERIFIED_ROLE_ID || '1566957216546684969';
         try {
           await interaction.member.roles.add(communityRoleId);
@@ -514,23 +505,21 @@ client.on('interactionCreate', async (interaction) => {
           console.error('Role add error:', e);
         }
 
-        // STEP 2: Give Role Selector Dropdown
+        // Dropdown to allow selecting Customer role if they are a buyer
         const roleMenu = new ActionRowBuilder().addComponents(
           new StringSelectMenuBuilder()
             .setCustomId('select_user_roles')
-            .setPlaceholder('🎭 Select your additional server roles...')
-            .setMinValues(0)
-            .setMaxValues(2)
+            .setPlaceholder('🛍️ Are you a store customer? Select here...')
             .addOptions([
               {
-                label: '🌸 COMMUNITY MEMBER',
-                description: 'Chat, participate in giveaways, community discussions',
+                label: '🌸 COMMUNITY MEMBER (Already Granted)',
+                description: 'Access Community Chat, Giveaways, & General Discussions',
                 value: '1566957216546684969',
                 default: true
               },
               {
-                label: '🛍️ CUSTOMER',
-                description: 'Customer lounge, order support & exclusive discounts',
+                label: '🛍️ CUSTOMER ACCESS',
+                description: 'Unlocks Store Menu, Premium Access, Content Studio & Support',
                 value: '1566957024749551656'
               }
             ])
@@ -538,13 +527,14 @@ client.on('interactionCreate', async (interaction) => {
 
         const successEmbed = new EmbedBuilder()
           .setColor(0x57F287)
-          .setTitle('🔓 VERIFICATION SUCCESSFUL!')
+          .setTitle('🔓 ACCESS GRANTED // VERIFICATION COMPLETE!')
           .setDescription(
-            `🎉 **Awesome, ${interaction.user}! You have passed the security verification.**\n\n` +
-            '✅ You have been granted access to NISHU STORE!\n\n' +
-            '👇 **Pick your role below** to customize your channel access:'
+            `🎉 **Welcome to NISHU STORE, ${interaction.user}!**\n\n` +
+            '✅ You have been granted the **🌸・COMMUNITY** role!\n' +
+            '🚀 **Community channels and chats are now unlocked.**\n\n' +
+            '🛍️ *Are you a store buyer or customer? Select "CUSTOMER ACCESS" in the menu below to unlock store orders & customer categories!*'
           )
-          .setFooter({ text: 'NISHU STORE • Role Customization' });
+          .setFooter({ text: 'NISHU STORE • Verification Gateway' });
 
         return interaction.update({
           embeds: [successEmbed],
@@ -553,27 +543,29 @@ client.on('interactionCreate', async (interaction) => {
         });
       } else {
         return interaction.reply({
-          content: '❌ **Incorrect code.** Please click "VERIFY & GET ROLES" to try again.',
+          content: '❌ **Incorrect code.** Please click "VERIFY NOW" to try again.',
           flags: 64
         });
       }
     }
 
-    // 3. User selects roles from Dropdown
+    // 3. User selects CUSTOMER in Dropdown
     if (interaction.isStringSelectMenu() && interaction.customId === 'select_user_roles') {
       const selected = interaction.values;
-      const allAssignable = ['1566957216546684969', '1566957024749551656'];
+      const customerRoleId = '1566957024749551656';
 
-      for (const roleId of allAssignable) {
-        if (selected.includes(roleId)) {
-          await interaction.member.roles.add(roleId).catch(() => {});
-        }
+      if (selected.includes(customerRoleId)) {
+        await interaction.member.roles.add(customerRoleId).catch(() => {});
+        return interaction.reply({
+          content: '🛍️ **CUSTOMER Role Granted!** All store categories, premium access, and customer channels have been unlocked for you! 🚀',
+          flags: 64
+        });
+      } else {
+        return interaction.reply({
+          content: '🌸 You have Community access active!',
+          flags: 64
+        });
       }
-
-      return interaction.reply({
-        content: '✨ **Roles updated successfully!** Welcome to NISHU STORE. All channels have been unlocked for you! 🚀',
-        flags: 64
-      });
     }
   } catch (err) {
     console.error('Interaction error:', err);
