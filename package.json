@@ -1,0 +1,17 @@
+{
+  "name": "discord-welcome-bot",
+  "version": "1.0.0",
+  "description": "24/7 Discord Welcome Bot with embeds, member count, and DMs",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^1.1.0",
+    "discord.js": "^14.17.3",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "gif-encoder-2": "^1.0.5",
+    "omggif": "^1.0.10"
+  }
+}
