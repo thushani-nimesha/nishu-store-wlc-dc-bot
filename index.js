@@ -1,3 +1,4 @@
+
 require('dotenv').config();
 const { 
   Client, 
@@ -8,7 +9,9 @@ const {
   ActionRowBuilder, 
   ButtonBuilder, 
   ButtonStyle,
-  StringSelectMenuBuilder
+  StringSelectMenuBuilder,
+  ChannelType,
+  PermissionFlagsBits
 } = require('discord.js');
 const express = require('express');
 const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
@@ -314,6 +317,7 @@ client.once('clientReady', async () => {
   client.user.setActivity('NISHU STORE 🚀', { type: ActivityType.Watching });
 
   setupRolesChannelPanel();
+  setupTicketPanel();
 });
 
 client.once('ready', () => {
@@ -567,10 +571,268 @@ client.on('interactionCreate', async (interaction) => {
         });
       }
     }
+
+    // 4. Ticket System: Open Ticket Buttons
+    if (interaction.isButton() && (interaction.customId === 'ticket_buy' || interaction.customId === 'ticket_support')) {
+      await handleTicketCreate(interaction);
+    }
+
+    // 5. Ticket System: Close Ticket Button
+    if (interaction.isButton() && interaction.customId === 'ticket_close') {
+      await handleTicketClose(interaction);
+    }
   } catch (err) {
     console.error('Interaction error:', err);
   }
 });
+
+// --- TICKET SYSTEM CONSTANTS ---
+const TICKET_CATEGORY_ID = process.env.TICKET_CATEGORY_ID || '1566967818866524212';
+const TICKET_PANEL_CHANNEL_ID = process.env.TICKET_PANEL_CHANNEL_ID || '1566968095422287912';
+const TICKET_LOG_CHANNEL_ID = process.env.TICKET_LOG_CHANNEL_ID || '1566975747879477299';
+
+// Staff Roles with ticket access
+const STAFF_ROLE_IDS = [
+  '1566955712851222699', // 👑 OWNER
+  '1566956388213850153', // 💜 STORE MANAGER
+  '1566956542933213345', // 🛡️ ADMIN
+  '1566956709115728083'  // 🎫 SUPPORT TEAM
+];
+
+// Setup Ticket Panel in #open-a-ticket
+async function setupTicketPanel() {
+  try {
+    const channel = client.channels.cache.get(TICKET_PANEL_CHANNEL_ID);
+    if (!channel) {
+      console.warn('⚠️ Ticket panel channel not found:', TICKET_PANEL_CHANNEL_ID);
+      return;
+    }
+
+    const messages = await channel.messages.fetch({ limit: 10 });
+    const existingMsg = messages.find(m => m.author.id === client.user.id && m.embeds.length > 0 && m.embeds[0].title?.includes('SUPPORT & ORDER DESK'));
+    if (existingMsg) {
+      console.log('📌 Ticket panel already exists in #open-a-ticket.');
+      return;
+    }
+
+    const ticketEmbed = new EmbedBuilder()
+      .setColor(0x5865F2)
+      .setTitle('🎫 NISHU STORE • SUPPORT & ORDER DESK')
+      .setDescription(
+        'Welcome to the official **NISHU STORE Help Desk**!\n\n' +
+        'Need to place an order, make a payment, or get assistance with digital services? Click a button below to open a private ticket with our staff:\n\n' +
+        '🛒 **BUY / ORDER TICKET**\n' +
+        '└ For purchasing accounts, digital assets, subscriptions & custom orders.\n\n' +
+        '🛠️ **GENERAL SUPPORT**\n' +
+        '└ For payment inquiries, technical assistance, questions & order help.\n\n' +
+        '⚠️ *Please do not open multiple tickets for the same request.*'
+      )
+      .setFooter({ text: 'NISHU STORE • Customer Service 24/7' })
+      .setTimestamp();
+
+    const ticketButtons = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('ticket_buy')
+        .setLabel('Buy / Order')
+        .setEmoji('🛒')
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId('ticket_support')
+        .setLabel('Get Support')
+        .setEmoji('🛠️')
+        .setStyle(ButtonStyle.Primary)
+    );
+
+    await channel.send({ embeds: [ticketEmbed], components: [ticketButtons] });
+    console.log('✅ Posted Ticket Panel in #open-a-ticket');
+  } catch (err) {
+    console.error('Error in setupTicketPanel:', err);
+  }
+}
+
+// Handle Ticket Creation
+async function handleTicketCreate(interaction) {
+  try {
+    await interaction.deferReply({ flags: 64 });
+
+    const guild = interaction.guild;
+    const user = interaction.user;
+    const isOrder = interaction.customId === 'ticket_buy';
+    const typeLabel = isOrder ? 'Order' : 'Support';
+    const prefix = isOrder ? '🛒' : '🛠️';
+
+    // Prevent user from opening too many duplicate open tickets
+    const existingChannel = guild.channels.cache.find(c => 
+      c.parentId === TICKET_CATEGORY_ID && 
+      c.topic && 
+      c.topic.includes(user.id)
+    );
+
+    if (existingChannel) {
+      return interaction.editReply({
+        content: `⚠️ You already have an open ticket in ${existingChannel}! Please use that channel.`
+      });
+    }
+
+    // Channel name format: order-username or support-username
+    const sanitizedName = user.username.toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 15) || 'user';
+    const channelName = `${prefix}・${isOrder ? 'order' : 'support'}-${sanitizedName}`;
+
+    // Permission overwrites: private channel
+    const permissionOverwrites = [
+      {
+        id: guild.roles.everyone.id,
+        deny: [PermissionFlagsBits.ViewChannel]
+      },
+      {
+        id: user.id,
+        allow: [
+          PermissionFlagsBits.ViewChannel,
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.AttachFiles,
+          PermissionFlagsBits.EmbedLinks,
+          PermissionFlagsBits.ReadMessageHistory
+        ]
+      },
+      {
+        id: client.user.id,
+        allow: [
+          PermissionFlagsBits.ViewChannel,
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.ManageChannels,
+          PermissionFlagsBits.EmbedLinks
+        ]
+      }
+    ];
+
+    // Grant access to Staff roles
+    for (const roleId of STAFF_ROLE_IDS) {
+      if (guild.roles.cache.has(roleId)) {
+        permissionOverwrites.push({
+          id: roleId,
+          allow: [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.SendMessages,
+            PermissionFlagsBits.AttachFiles,
+            PermissionFlagsBits.EmbedLinks,
+            PermissionFlagsBits.ReadMessageHistory
+          ]
+        });
+      }
+    }
+
+    // Create the ticket channel
+    const ticketChannel = await guild.channels.create({
+      name: channelName,
+      type: ChannelType.GuildText,
+      parent: TICKET_CATEGORY_ID,
+      topic: `Ticket Owner: ${user.tag} (${user.id}) | Type: ${typeLabel}`,
+      permissionOverwrites
+    });
+
+    // Send Welcome Message inside the new ticket
+    const ticketWelcomeEmbed = new EmbedBuilder()
+      .setColor(isOrder ? 0x57F287 : 0x5865F2)
+      .setTitle(`${prefix} Welcome to your ${typeLabel} Ticket!`)
+      .setDescription(
+        `Hello ${user}, thank you for contacting **NISHU STORE**!\n\n` +
+        (isOrder
+          ? '📦 **For Orders:** Please mention the product/service you want to purchase and your preferred payment method.\n'
+          : '🛠️ **For Support:** Please describe your issue in detail so our team can help you immediately.\n') +
+        '\n👥 Our staff team (<@&1566956709115728083>) will be with you shortly.\n\n' +
+        '🔒 *Click the button below when you are finished to close this ticket.*'
+      )
+      .setFooter({ text: 'NISHU STORE • Ticket Help Desk' })
+      .setTimestamp();
+
+    const controlRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('ticket_close')
+        .setLabel('Close Ticket')
+        .setEmoji('🔒')
+        .setStyle(ButtonStyle.Danger)
+    );
+
+    await ticketChannel.send({
+      content: `${user} | <@&1566956709115728083> 🔔`,
+      embeds: [ticketWelcomeEmbed],
+      components: [controlRow]
+    });
+
+    // Notify user in the interaction
+    await interaction.editReply({
+      content: `✅ Your ticket channel has been created: ${ticketChannel}! Please click to view.`
+    });
+
+    // Send Ticket Open Log to #ticket-logs
+    const logChannel = client.channels.cache.get(TICKET_LOG_CHANNEL_ID);
+    if (logChannel) {
+      const openLog = new EmbedBuilder()
+        .setColor(0x57F287)
+        .setTitle('📥 Ticket Opened')
+        .addFields(
+          { name: '👤 User', value: `${user.tag} (${user.id})`, inline: true },
+          { name: '🏷️ Type', value: `${prefix} ${typeLabel}`, inline: true },
+          { name: '💬 Channel', value: `${ticketChannel.name} (<#${ticketChannel.id}>)`, inline: true }
+        )
+        .setTimestamp();
+      await logChannel.send({ embeds: [openLog] }).catch(() => {});
+    }
+
+    console.log(`🎫 Created ticket channel ${ticketChannel.name} for ${user.tag}`);
+  } catch (err) {
+    console.error('Error creating ticket channel:', err);
+    await interaction.editReply({
+      content: '❌ Failed to create ticket channel. Please contact an admin!'
+    }).catch(() => {});
+  }
+}
+
+// Handle Ticket Closing
+async function handleTicketClose(interaction) {
+  try {
+    const channel = interaction.channel;
+
+    // Check if channel is inside the ticket category
+    if (channel.parentId !== TICKET_CATEGORY_ID) {
+      return interaction.reply({
+        content: '❌ This command can only be used inside a ticket channel!',
+        flags: 64
+      });
+    }
+
+    const closeEmbed = new EmbedBuilder()
+      .setColor(0xED4245)
+      .setTitle('🔒 Ticket Closing')
+      .setDescription('This ticket will be permanently closed and deleted in **5 seconds**...')
+      .setFooter({ text: 'NISHU STORE • Ticket Management' });
+
+    await interaction.reply({ embeds: [closeEmbed] });
+
+    // Send Closed Log to #ticket-logs
+    const logChannel = client.channels.cache.get(TICKET_LOG_CHANNEL_ID);
+    if (logChannel) {
+      const closeLog = new EmbedBuilder()
+        .setColor(0xED4245)
+        .setTitle('📕 Ticket Closed')
+        .addFields(
+          { name: '💬 Channel', value: channel.name, inline: true },
+          { name: '👤 Closed By', value: `${interaction.user.tag} (${interaction.user.id})`, inline: true },
+          { name: 'ℹ️ Topic', value: channel.topic || 'N/A', inline: false }
+        )
+        .setTimestamp();
+      await logChannel.send({ embeds: [closeLog] }).catch(() => {});
+    }
+
+    setTimeout(async () => {
+      await channel.delete('Ticket closed by user or staff').catch(err => {
+        console.error('Error deleting ticket channel:', err);
+      });
+    }, 5000);
+  } catch (err) {
+    console.error('Error closing ticket:', err);
+  }
+}
 
 // --- 7. START BOT ---
 if (!process.env.DISCORD_TOKEN) {
