@@ -11,13 +11,20 @@ const {
   ButtonStyle,
   StringSelectMenuBuilder,
   ChannelType,
-  PermissionFlagsBits
+  PermissionFlagsBits,
+  SlashCommandBuilder,
+  REST,
+  Routes,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle
 } = require('discord.js');
 const express = require('express');
 const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
 const GIFEncoder = require('gif-encoder-2');
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
 
 // --- 0. REGISTER MODERN SLEEK TYPOGRAPHY ---
 const winFonts = path.join(process.env.WINDIR || 'C:\\Windows', 'Fonts');
@@ -309,6 +316,7 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildVoiceStates,
   ],
 });
 
@@ -318,6 +326,7 @@ client.once('clientReady', async () => {
 
   setupRolesChannelPanel();
   setupTicketPanel();
+  registerSlashCommands();
 });
 
 client.once('ready', () => {
@@ -581,6 +590,23 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.isButton() && interaction.customId === 'ticket_close') {
       await handleTicketClose(interaction);
     }
+
+    // 6. VIP Cinema System
+    if (interaction.isChatInputCommand() && interaction.commandName === 'cinema') {
+      await handleCinemaCommand(interaction);
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('cinema_')) {
+      await handleCinemaButton(interaction);
+    }
+
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('cinema_')) {
+      await handleCinemaSelect(interaction);
+    }
+
+    if (interaction.isModalSubmit() && interaction.customId === 'modal_cinema_search') {
+      await handleCinemaModal(interaction);
+    }
   } catch (err) {
     console.error('Interaction error:', err);
   }
@@ -834,10 +860,385 @@ async function handleTicketClose(interaction) {
   }
 }
 
-// --- 7. START BOT ---
+// ==========================================
+// --- 7. VIP MOVIE & PRIVATE CINEMA SYSTEM ---
+// ==========================================
+const VIP_ROLE_ID = '1566956868461527133'; // 💎・VIP MEMBER
+const activeCinemaRooms = new Map(); // voiceChannelId -> { ownerId, guildId }
+
+// Register Slash Commands: /cinema
+async function registerSlashCommands() {
+  try {
+    const commands = [
+      new SlashCommandBuilder()
+        .setName('cinema')
+        .setDescription('🎬 NISHU VIP Private Cinema & Watch Party Hub')
+        .addSubcommand(sub =>
+          sub
+            .setName('search')
+            .setDescription('Search for movies & create a private Watch Party')
+            .addStringOption(opt =>
+              opt.setName('query')
+                .setDescription('Movie title to search (e.g. Inception, Avatar, Marvel)')
+                .setRequired(true)
+            )
+        )
+        .addSubcommand(sub =>
+          sub
+            .setName('panel')
+            .setDescription('Open the VIP Cinema Control Panel')
+        )
+    ];
+
+    const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+    console.log('🔄 Registering VIP Cinema Slash Commands...');
+    await rest.put(
+      Routes.applicationCommands(client.user.id),
+      { body: commands }
+    );
+    console.log('✅ Successfully registered VIP Cinema slash commands!');
+  } catch (err) {
+    console.error('Error registering slash commands:', err);
+  }
+}
+
+// Fetch Movie Search from OMDb
+function searchMovieOMDb(query) {
+  return new Promise((resolve) => {
+    const options = {
+      hostname: 'www.omdbapi.com',
+      path: `/?s=${encodeURIComponent(query)}&apikey=trilogy`,
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    };
+    https.get(options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          resolve(json.Search || []);
+        } catch (e) {
+          resolve([]);
+        }
+      });
+    }).on('error', () => resolve([]));
+  });
+}
+
+// Fetch Full Movie Details
+function getMovieDetails(imdbID) {
+  return new Promise((resolve) => {
+    const options = {
+      hostname: 'www.omdbapi.com',
+      path: `/?i=${imdbID}&plot=full&apikey=trilogy`,
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    };
+    https.get(options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch (e) {
+          resolve(null);
+        }
+      });
+    }).on('error', () => resolve(null));
+  });
+}
+
+// Helper: Check if user is VIP or Staff
+function isUserVIP(member) {
+  if (!member) return false;
+  if (member.permissions.has(PermissionFlagsBits.Administrator)) return true;
+  return member.roles.cache.has(VIP_ROLE_ID);
+}
+
+// Handle /cinema command
+async function handleCinemaCommand(interaction) {
+  const member = interaction.member;
+
+  // VIP Role Gate
+  if (!isUserVIP(member)) {
+    const noVipEmbed = new EmbedBuilder()
+      .setColor(0xED4245)
+      .setTitle('💎 VIP CINEMA // ACCESS RESTRICTED')
+      .setDescription(
+        `Hey ${interaction.user}, the **Private Cinema & Watch Party Hub** is an exclusive feature for **💎・VIP MEMBERS**!\n\n` +
+        '🌟 **VIP Perks:**\n' +
+        '• 🎬 Unlimited Movie & TV Series Streaming\n' +
+        '• 🍿 Create Private Voice Channels for you & your friends\n' +
+        '• ⚡ Ad-Free Instant HD Streaming Players\n\n' +
+        '👉 Please open a ticket in <#1566968095422287912> to upgrade to VIP Access!'
+      )
+      .setFooter({ text: 'NISHU STORE • VIP Lounge' });
+
+    return interaction.reply({ embeds: [noVipEmbed], flags: 64 });
+  }
+
+  const subcommand = interaction.options.getSubcommand();
+
+  if (subcommand === 'panel') {
+    const panelEmbed = new EmbedBuilder()
+      .setColor(0x9333EA)
+      .setTitle('🍿 NISHU STORE // VIP PRIVATE CINEMA')
+      .setDescription(
+        `Welcome to your private cinema lounge, ${interaction.user}!\n\n` +
+        '🎬 **How it works:**\n' +
+        '1. Click **"🔍 Search Movie"** below to find any movie or show.\n' +
+        '2. Choose your movie from the interactive list.\n' +
+        '3. Click **"🍿 Create Private Cinema VC"** to spawn a private cinema room for you & your friends!\n' +
+        '4. Play movie in VC and invite your friends anytime.\n\n' +
+        '⚡ *HD Quality • Ad-Free Streams • Auto-cleaning Rooms*'
+      )
+      .setFooter({ text: 'NISHU STORE • VIP Experience' })
+      .setTimestamp();
+
+    const panelRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('cinema_btn_open_search')
+        .setLabel('🔍 Search Movie')
+        .setStyle(ButtonStyle.Primary)
+    );
+
+    return interaction.reply({ embeds: [panelEmbed], components: [panelRow], flags: 64 });
+  }
+
+  if (subcommand === 'search') {
+    await interaction.deferReply({ flags: 64 });
+    const query = interaction.options.getString('query');
+    await displayMovieSearchResults(interaction, query);
+  }
+}
+
+// Search and Display Movie Results
+async function displayMovieSearchResults(interaction, query) {
+  const results = await searchMovieOMDb(query);
+
+  if (!results || results.length === 0) {
+    return interaction.editReply({
+      content: `❌ No movies found matching "**${query}**". Please check the spelling and try again!`
+    });
+  }
+
+  const topResults = results.slice(0, 10);
+  const selectMenu = new StringSelectMenuBuilder()
+    .setCustomId('cinema_select_movie')
+    .setPlaceholder('🎬 Select a movie to view & create Watch Party...');
+
+  topResults.forEach((m) => {
+    selectMenu.addOptions({
+      label: m.Title.slice(0, 70),
+      description: `📅 ${m.Year} • Type: ${m.Type.toUpperCase()} • ID: ${m.imdbID}`,
+      value: m.imdbID,
+      emoji: '🍿'
+    });
+  });
+
+  const searchEmbed = new EmbedBuilder()
+    .setColor(0x38BDF8)
+    .setTitle(`🔍 Movies Found for "${query}"`)
+    .setDescription('Select your movie from the dropdown menu below to see details and start your **Private Cinema Watch Party**!')
+    .setFooter({ text: 'Found ' + topResults.length + ' results • NISHU VIP Cinema' });
+
+  const row = new ActionRowBuilder().addComponents(selectMenu);
+  return interaction.editReply({ embeds: [searchEmbed], components: [row] });
+}
+
+// Handle Cinema Select Menu (Movie Selected)
+async function handleCinemaSelect(interaction) {
+  if (interaction.customId === 'cinema_select_movie') {
+    await interaction.deferUpdate();
+    const imdbID = interaction.values[0];
+    const movie = await getMovieDetails(imdbID);
+
+    if (!movie || movie.Response === 'False') {
+      return interaction.followUp({ content: '❌ Could not retrieve movie details.', flags: 64 });
+    }
+
+    // Embed with Movie Info
+    const movieEmbed = new EmbedBuilder()
+      .setColor(0x8B5CF6)
+      .setTitle(`🎬 ${movie.Title} (${movie.Year})`)
+      .setDescription(
+        `⭐ **IMDb Rating:** \`${movie.imdbRating}/10\`  •  ⏱️ **Runtime:** \`${movie.Runtime}\`\n` +
+        `🎭 **Genre:** \`${movie.Genre}\`  •  🌐 **Language:** \`${movie.Language}\`\n\n` +
+        `📝 **Plot Synopsis:**\n${movie.Plot.slice(0, 500)}\n\n` +
+        `👥 **Cast:** ${movie.Actors}\n` +
+        `🎬 **Director:** ${movie.Director}`
+      )
+      .setFooter({ text: `IMDb ID: ${movie.imdbID} • NISHU VIP Cinema` });
+
+    if (movie.Poster && movie.Poster !== 'N/A') {
+      movieEmbed.setImage(movie.Poster);
+    }
+
+    // Clean player stream links (Multiple HD fallback sources)
+    const streamSource1 = `https://vidsrc.to/embed/movie/${movie.imdbID}`;
+    const streamSource2 = `https://autoembed.to/movie/imdb/${movie.imdbID}`;
+
+    const buttonRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`cinema_create_room_${movie.imdbID}_${movie.Title.replace(/[^a-zA-Z0-9]/g, '').slice(0, 10)}`)
+        .setLabel('🍿 Create Private Cinema VC')
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setLabel('▶️ Watch Player (Source 1)')
+        .setStyle(ButtonStyle.Link)
+        .setURL(streamSource1),
+      new ButtonBuilder()
+        .setLabel('▶️ Player (Source 2)')
+        .setStyle(ButtonStyle.Link)
+        .setURL(streamSource2)
+    );
+
+    return interaction.editReply({ embeds: [movieEmbed], components: [buttonRow] });
+  }
+}
+
+// Handle Cinema Buttons
+async function handleCinemaButton(interaction) {
+  // 1. Open Search Modal
+  if (interaction.customId === 'cinema_btn_open_search') {
+    const modal = new ModalBuilder()
+      .setCustomId('modal_cinema_search')
+      .setTitle('🔍 Search VIP Movie / Series');
+
+    const searchInput = new TextInputBuilder()
+      .setCustomId('cinema_search_input')
+      .setLabel('Movie Title')
+      .setPlaceholder('e.g. Spider-Man, Avengers, Interstellar')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true);
+
+    const row = new ActionRowBuilder().addComponents(searchInput);
+    modal.addComponents(row);
+    return interaction.showModal(modal);
+  }
+
+  // 2. Create Private Cinema Voice Channel
+  if (interaction.customId.startsWith('cinema_create_room_')) {
+    await interaction.deferReply({ flags: 64 });
+    const parts = interaction.customId.replace('cinema_create_room_', '').split('_');
+    const imdbID = parts[0];
+    const shortTitle = parts[1] || 'Movie';
+
+    const guild = interaction.guild;
+    const user = interaction.user;
+
+    // Check if user already has an active room
+    for (const [chId, data] of activeCinemaRooms.entries()) {
+      if (data.ownerId === user.id) {
+        const existing = guild.channels.cache.get(chId);
+        if (existing) {
+          return interaction.editReply({
+            content: `⚠️ You already have an active Cinema Room: ${existing}!\nPlease join or leave that room before creating a new one.`
+          });
+        } else {
+          activeCinemaRooms.delete(chId);
+        }
+      }
+    }
+
+    // VIP Category or fallback
+    const parentCategory = guild.channels.cache.find(c => c.type === ChannelType.GuildCategory && c.name.includes('PREMIUM ACCESS'));
+
+    // Create Temporary Private Voice Channel
+    try {
+      const cinemaRoom = await guild.channels.create({
+        name: `🍿・${user.username}-cinema`,
+        type: ChannelType.GuildVoice,
+        parent: parentCategory ? parentCategory.id : undefined,
+        permissionOverwrites: [
+          {
+            id: guild.roles.everyone.id,
+            deny: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect]
+          },
+          {
+            id: user.id,
+            allow: [
+              PermissionFlagsBits.ViewChannel,
+              PermissionFlagsBits.Connect,
+              PermissionFlagsBits.Speak,
+              PermissionFlagsBits.Stream,
+              PermissionFlagsBits.MoveMembers,
+              PermissionFlagsBits.ManageChannels
+            ]
+          },
+          {
+            id: VIP_ROLE_ID,
+            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect]
+          }
+        ]
+      });
+
+      activeCinemaRooms.set(cinemaRoom.id, { ownerId: user.id, guildId: guild.id });
+
+      const streamUrl = `https://vidsrc.to/embed/movie/${imdbID}`;
+      const roomCreatedEmbed = new EmbedBuilder()
+        .setColor(0x57F287)
+        .setTitle('🍿 PRIVATE CINEMA ROOM CREATED!')
+        .setDescription(
+          `🎉 Your Private Watch Party Room is ready in ${cinemaRoom}!\n\n` +
+          '**🎮 How to Watch with Friends:**\n' +
+          '1. Join your room: ' + cinemaRoom.toString() + '\n' +
+          '2. Click **"▶️ Open Movie Player"** below to load the video stream.\n' +
+          '3. Use Discord Screen Share / Stream in the VC or invite friends directly into the voice room!\n\n' +
+          '⚠️ *This voice room will automatically delete when everyone leaves.*'
+        )
+        .setFooter({ text: 'NISHU VIP Cinema • Enjoy the movie!' });
+
+      const linkRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setLabel('▶️ Open Movie Stream Player')
+          .setStyle(ButtonStyle.Link)
+          .setURL(streamUrl)
+      );
+
+      return interaction.editReply({ embeds: [roomCreatedEmbed], components: [linkRow] });
+    } catch (e) {
+      console.error('Error creating cinema voice room:', e);
+      return interaction.editReply({ content: '❌ Failed to create cinema room: ' + e.message });
+    }
+  }
+}
+
+// Handle Modal Submit
+async function handleCinemaModal(interaction) {
+  await interaction.deferReply({ flags: 64 });
+  const query = interaction.fields.getTextInputValue('cinema_search_input');
+  await displayMovieSearchResults(interaction, query);
+}
+
+// Auto-Delete empty cinema voice rooms
+client.on('voiceStateUpdate', async (oldState, newState) => {
+  const channel = oldState.channel;
+  if (!channel) return;
+
+  if (activeCinemaRooms.has(channel.id)) {
+    // If no members are left in the channel, delete it
+    if (channel.members.size === 0) {
+      activeCinemaRooms.delete(channel.id);
+      setTimeout(async () => {
+        try {
+          const recheck = channel.guild.channels.cache.get(channel.id);
+          if (recheck && recheck.members.size === 0) {
+            await recheck.delete('Cinema room empty - auto cleaned up');
+            console.log(`🧹 Auto-deleted empty cinema room: ${channel.name}`);
+          }
+        } catch (err) {}
+      }, 5000);
+    }
+  }
+});
+
+// ==========================================
+// --- 8. START BOT ---
+// ==========================================
 if (!process.env.DISCORD_TOKEN) {
   console.error('❌ ERROR: DISCORD_TOKEN is missing in your .env file!');
   process.exit(1);
 }
 
 client.login(process.env.DISCORD_TOKEN);
+
