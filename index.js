@@ -331,8 +331,8 @@ async function setupRolesChannelPanel() {
     const channel = client.channels.cache.get(rolesChannelId);
     if (!channel) return;
 
-    const messages = await channel.messages.fetch({ limit: 10 });
-    const botMsg = messages.find(m => m.author.id === client.user.id && m.embeds.length > 0 && m.embeds[0].title?.includes('VERIFY & GET ROLES'));
+    const messages = await channel.messages.fetch({ limit: 20 });
+    const botMsg = messages.find(m => m.author.id === client.user.id && m.embeds.length > 0 && m.embeds[0].title?.includes('VERIFY & UNLOCK NISHU STORE'));
     if (botMsg) {
       console.log('📌 Verification & Role Panel already exists in #choose-your-roles.');
       return;
