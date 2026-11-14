@@ -650,6 +650,16 @@ client.on('interactionCreate', async (interaction) => {
       await handleCinemaCommand(interaction);
     }
 
+    // 7. Admin Say Command
+    if (interaction.isChatInputCommand() && interaction.commandName === 'say') {
+      await handleSayCommand(interaction);
+    }
+
+    // 8. Admin Broadcast (Mass DM) Command
+    if (interaction.isChatInputCommand() && interaction.commandName === 'broadcast') {
+      await handleBroadcastCommand(interaction);
+    }
+
     if (interaction.isButton() && interaction.customId.startsWith('cinema_')) {
       await handleCinemaButton(interaction);
     }
@@ -941,6 +951,45 @@ async function registerSlashCommands() {
           sub
             .setName('panel')
             .setDescription('Open the VIP Cinema Control Panel')
+        ),
+      new SlashCommandBuilder()
+        .setName('say')
+        .setDescription('📢 [ADMIN] Send a message or embed as Nishu Bot to any channel')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        .addChannelOption(opt =>
+          opt.setName('channel')
+            .setDescription('Channel to send the message to')
+            .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+            .setRequired(true)
+        )
+        .addStringOption(opt =>
+          opt.setName('message')
+            .setDescription('The message content to post')
+            .setRequired(true)
+        )
+        .addStringOption(opt =>
+          opt.setName('title')
+            .setDescription('Optional title for an embed (leave empty for regular message)')
+            .setRequired(false)
+        )
+        .addStringOption(opt =>
+          opt.setName('color')
+            .setDescription('Hex color code for embed (e.g. #5865F2, #8B5CF6, #10B981)')
+            .setRequired(false)
+        ),
+      new SlashCommandBuilder()
+        .setName('broadcast')
+        .setDescription('📬 [OWNER/ADMIN] Send a Direct Message (DM) to all server members safely')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        .addStringOption(opt =>
+          opt.setName('message')
+            .setDescription('The message content to DM to all members')
+            .setRequired(true)
+        )
+        .addStringOption(opt =>
+          opt.setName('title')
+            .setDescription('Optional announcement title for the DM embed')
+            .setRequired(false)
         )
     ];
 
@@ -1309,7 +1358,145 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 });
 
 // ==========================================
-// --- 8. START BOT ---
+// --- 8. ADMIN / OWNER MANAGEMENT COMMANDS ---
+// ==========================================
+
+// Helper to check Admin/Owner permission
+function isAdminOrOwner(member) {
+  if (!member) return false;
+  if (member.guild.ownerId === member.id) return true;
+  if (member.permissions.has(PermissionFlagsBits.Administrator)) return true;
+  return STAFF_ROLE_IDS.includes('1566955712851222699') && member.roles.cache.has('1566955712851222699');
+}
+
+// 1. /say Command (Send message/embed to specified channel)
+async function handleSayCommand(interaction) {
+  if (!isAdminOrOwner(interaction.member)) {
+    return interaction.reply({
+      content: '⛔ **Access Denied.** Only Server Admins & Owner can use `/say`.',
+      flags: 64
+    });
+  }
+
+  const targetChannel = interaction.options.getChannel('channel');
+  const message = interaction.options.getString('message');
+  const title = interaction.options.getString('title');
+  const colorStr = interaction.options.getString('color');
+
+  try {
+    if (title || colorStr) {
+      let colorNum = 0x5865F2;
+      if (colorStr) {
+        const hex = colorStr.replace('#', '');
+        const parsed = parseInt(hex, 16);
+        if (!isNaN(parsed)) colorNum = parsed;
+      }
+
+      const embed = new EmbedBuilder()
+        .setColor(colorNum)
+        .setDescription(message)
+        .setFooter({ text: interaction.guild.name, iconURL: interaction.guild.iconURL() || undefined })
+        .setTimestamp();
+
+      if (title) embed.setTitle(title);
+
+      await targetChannel.send({ embeds: [embed] });
+    } else {
+      await targetChannel.send({ content: message });
+    }
+
+    return interaction.reply({
+      content: `✅ Successfully sent message to ${targetChannel}!`,
+      flags: 64
+    });
+  } catch (err) {
+    console.error('Error in /say:', err);
+    return interaction.reply({
+      content: `❌ Failed to send message: ${err.message}`,
+      flags: 64
+    });
+  }
+}
+
+// 2. /broadcast Command (Safe Mass DM to all members with queue)
+async function handleBroadcastCommand(interaction) {
+  if (!isAdminOrOwner(interaction.member)) {
+    return interaction.reply({
+      content: '⛔ **Access Denied.** Only Server Owner & Admins can use `/broadcast`.',
+      flags: 64
+    });
+  }
+
+  await interaction.deferReply({ flags: 64 });
+
+  const rawMessage = interaction.options.getString('message');
+  const title = interaction.options.getString('title') || '📢 Important Announcement';
+  const guild = interaction.guild;
+
+  // Fetch all members
+  await interaction.editReply({ content: '⏳ Fetching server members list...' });
+  let members;
+  try {
+    members = await guild.members.fetch();
+  } catch (err) {
+    return interaction.editReply({ content: '❌ Failed to fetch members: ' + err.message });
+  }
+
+  // Filter out bots
+  const humanMembers = members.filter(m => !m.user.bot);
+  const total = humanMembers.size;
+
+  await interaction.editReply({
+    content: `🚀 Starting Broadcast to **${total} members**.\n` +
+      `⚡ *Using safe delay (1.2s per user) to protect bot from Discord rate limits.*\n` +
+      `Estimated completion time: **~${Math.ceil((total * 1.2) / 60)} minutes**.`
+  });
+
+  const dmEmbed = new EmbedBuilder()
+    .setColor(0x5865F2)
+    .setTitle(`📢 ${title}`)
+    .setDescription(rawMessage)
+    .setFooter({ text: `${guild.name} • Official Announcement`, iconURL: guild.iconURL() || undefined })
+    .setTimestamp();
+
+  let sent = 0;
+  let failed = 0;
+
+  // Process in background
+  (async () => {
+    for (const [, member] of humanMembers) {
+      try {
+        await member.send({ embeds: [dmEmbed] });
+        sent++;
+      } catch (err) {
+        // DMs closed or blocked
+        failed++;
+      }
+      // Safe delay between DMs to prevent Discord API block
+      await new Promise(r => setTimeout(r, 1200));
+    }
+
+    console.log(`📢 Broadcast complete: ${sent} delivered, ${failed} failed.`);
+    // Send completion report to Staff Log
+    const logChannel = client.channels.cache.get(TICKET_LOG_CHANNEL_ID);
+    if (logChannel) {
+      const report = new EmbedBuilder()
+        .setColor(0x57F287)
+        .setTitle('📬 Mass Broadcast Completed')
+        .addFields(
+          { name: '👤 Triggered By', value: interaction.user.tag, inline: true },
+          { name: '📨 Delivered', value: `${sent}`, inline: true },
+          { name: '🚫 Blocked / Closed DMs', value: `${failed}`, inline: true },
+          { name: '📝 Announcement Title', value: title, inline: false }
+        )
+        .setTimestamp();
+      await logChannel.send({ embeds: [report] }).catch(() => {});
+    }
+  })();
+}
+
+// ==========================================
+// --- 9. START BOT ---
 // ==========================================
 if (!process.env.DISCORD_TOKEN) {
   console.error('❌ ERROR: DISCORD_TOKEN is missing in your .env file!');
