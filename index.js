@@ -10,6 +10,7 @@ const {
   ButtonBuilder, 
   ButtonStyle,
   StringSelectMenuBuilder,
+  ChannelSelectMenuBuilder,
   ChannelType,
   PermissionFlagsBits,
   SlashCommandBuilder,
@@ -327,6 +328,7 @@ client.once('clientReady', async () => {
   setupRolesChannelPanel();
   setupTicketPanel();
   setupCinemaPanel();
+  setupBotTextsPanel();
   registerSlashCommands();
 });
 
@@ -658,6 +660,19 @@ client.on('interactionCreate', async (interaction) => {
     // 8. Admin Broadcast (Mass DM) Command
     if (interaction.isChatInputCommand() && interaction.commandName === 'broadcast') {
       await handleBroadcastCommand(interaction);
+    }
+
+    // 9. Interactive Bot-Texts Dashboard Interactions
+    if (interaction.isButton() && interaction.customId.startsWith('panel_btn_')) {
+      await handleDashboardButton(interaction);
+    }
+
+    if (interaction.isChannelSelectMenu() && interaction.customId === 'panel_select_channels') {
+      await handleDashboardChannelSelect(interaction);
+    }
+
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_panel_')) {
+      await handleDashboardModalSubmit(interaction);
     }
 
     if (interaction.isButton() && interaction.customId.startsWith('cinema_')) {
@@ -1496,7 +1511,307 @@ async function handleBroadcastCommand(interaction) {
 }
 
 // ==========================================
-// --- 9. START BOT ---
+// --- 9. INTERACTIVE DASHBOARD (#bot-texts) ---
+// ==========================================
+const adminPendingSelections = new Map(); // userId -> { channelIds: [] }
+
+// Persistent Dashboard Setup in #bot-texts
+async function setupBotTextsPanel() {
+  try {
+    const guild = client.guilds.cache.first();
+    if (!guild) return;
+
+    const channel = guild.channels.cache.find(c => c.name.includes('bot-texts'));
+    if (!channel) return;
+
+    const messages = await channel.messages.fetch({ limit: 10 });
+    const botMsg = messages.find(m => m.author.id === client.user.id && m.embeds.length > 0 && m.embeds[0].title?.includes('COMMAND & BROADCAST CONSOLE'));
+    if (botMsg) {
+      console.log('📌 Dashboard Panel already exists in #bot-texts.');
+      return;
+    }
+
+    const dashboardEmbed = new EmbedBuilder()
+      .setColor(0x5865F2)
+      .setTitle('🎛️ NISHU BOT // COMMAND & BROADCAST CONSOLE')
+      .setDescription(
+        'Welcome to your graphical **Server Management & Announcement Suite**! 👑\n\n' +
+        'Send messages, media embeds, announcements, or mass DMs without typing any slash commands.\n\n' +
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+        '**⚡ ACTION CONTROLS:**\n\n' +
+        '📢 **1. Send Channel Message (Single or Multiple):**\n' +
+        '└ Select target channel(s) from dropdown, type your text, attach image/video/gif link or embed styling!\n\n' +
+        '📬 **2. Send Mass DM (Broadcast to All Members):**\n' +
+        '└ Deliver direct announcements to all members\' inboxes safely with anti-spam protection.\n\n' +
+        '🔒 *Restricted to Server Owner & Admins only.*'
+      )
+      .setFooter({ text: 'NISHU STORE • Graphical Admin Console' });
+
+    const btnRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('panel_btn_start_channel_msg')
+        .setLabel('📢 Send Channel Message')
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId('panel_btn_start_mass_dm')
+        .setLabel('📬 Send Mass DM (Broadcast)')
+        .setStyle(ButtonStyle.Primary)
+    );
+
+    await channel.send({ embeds: [dashboardEmbed], components: [btnRow] });
+    console.log('✅ Posted Graphical Dashboard Panel in #bot-texts!');
+  } catch (err) {
+    console.error('Error in setupBotTextsPanel:', err);
+  }
+}
+
+// 1. Dashboard Button Handler
+async function handleDashboardButton(interaction) {
+  if (!isAdminOrOwner(interaction.member)) {
+    return interaction.reply({
+      content: '⛔ **Access Denied.** Only Server Owner & Admins can use this console.',
+      flags: 64
+    });
+  }
+
+  // Button: Send Channel Message -> Prompt Channel Selector
+  if (interaction.customId === 'panel_btn_start_channel_msg') {
+    const channelSelect = new ChannelSelectMenuBuilder()
+      .setCustomId('panel_select_channels')
+      .setPlaceholder('📂 Select target channel(s) to post your message...')
+      .setChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+      .setMinValues(1)
+      .setMaxValues(5);
+
+    const row = new ActionRowBuilder().addComponents(channelSelect);
+
+    return interaction.reply({
+      content: '👇 **Step 1:** Select one or multiple channels below where you want to post your message:',
+      components: [row],
+      flags: 64
+    });
+  }
+
+  // Button: Open Mass DM Modal directly
+  if (interaction.customId === 'panel_btn_start_mass_dm') {
+    const modal = new ModalBuilder()
+      .setCustomId('modal_panel_mass_dm')
+      .setTitle('📬 Send Mass DM (Broadcast)');
+
+    const titleInput = new TextInputBuilder()
+      .setCustomId('dm_title')
+      .setLabel('Announcement Title')
+      .setPlaceholder('e.g. 📢 Big Announcement / Nishu Store Update')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true);
+
+    const messageInput = new TextInputBuilder()
+      .setCustomId('dm_message')
+      .setLabel('Message Body')
+      .setPlaceholder('Type your message that will be delivered directly to all member inboxes...')
+      .setStyle(TextInputStyle.Paragraph)
+      .setRequired(true);
+
+    const mediaInput = new TextInputBuilder()
+      .setCustomId('dm_media')
+      .setLabel('Optional Image / Banner URL')
+      .setPlaceholder('https://example.com/banner.png (optional image/gif)')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(false);
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(titleInput),
+      new ActionRowBuilder().addComponents(messageInput),
+      new ActionRowBuilder().addComponents(mediaInput)
+    );
+
+    return interaction.showModal(modal);
+  }
+}
+
+// 2. Channel Dropdown Selection Handler
+async function handleDashboardChannelSelect(interaction) {
+  const selectedChannels = interaction.values;
+  adminPendingSelections.set(interaction.user.id, selectedChannels);
+
+  // Show Message Compose Modal
+  const modal = new ModalBuilder()
+    .setCustomId('modal_panel_channel_post')
+    .setTitle('📝 Compose Channel Message / Media');
+
+  const titleInput = new TextInputBuilder()
+    .setCustomId('post_title')
+    .setLabel('Title / Header (Optional)')
+    .setPlaceholder('e.g. 🔥 LIMITED TIME OFFER (or leave empty for text)')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(false);
+
+  const contentInput = new TextInputBuilder()
+    .setCustomId('post_content')
+    .setLabel('Message Description / Text')
+    .setPlaceholder('Enter your announcement, rules, information or text here...')
+    .setStyle(TextInputStyle.Paragraph)
+    .setRequired(true);
+
+  const mediaInput = new TextInputBuilder()
+    .setCustomId('post_media')
+    .setLabel('Image / Video / GIF URL (Optional)')
+    .setPlaceholder('https://... image/gif/video link to embed')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(false);
+
+  const colorInput = new TextInputBuilder()
+    .setCustomId('post_color')
+    .setLabel('Embed Hex Color (Optional)')
+    .setPlaceholder('#5865F2, #8B5CF6, #10B981, #ED4245 (default blue)')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(false);
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(titleInput),
+    new ActionRowBuilder().addComponents(contentInput),
+    new ActionRowBuilder().addComponents(mediaInput),
+    new ActionRowBuilder().addComponents(colorInput)
+  );
+
+  return interaction.showModal(modal);
+}
+
+// 3. Modal Submission Handler (Post Message or Execute Mass DM)
+async function handleDashboardModalSubmit(interaction) {
+  // A. Post to Channel(s)
+  if (interaction.customId === 'modal_panel_channel_post') {
+    await interaction.deferReply({ flags: 64 });
+
+    const targetChannelIds = adminPendingSelections.get(interaction.user.id);
+    if (!targetChannelIds || targetChannelIds.length === 0) {
+      return interaction.editReply({ content: '❌ Session expired. Please click "Send Channel Message" again.' });
+    }
+
+    const title = interaction.fields.getTextInputValue('post_title');
+    const content = interaction.fields.getTextInputValue('post_content');
+    const mediaUrl = interaction.fields.getTextInputValue('post_media');
+    const colorStr = interaction.fields.getTextInputValue('post_color');
+
+    // Parse Color
+    let colorNum = 0x5865F2;
+    if (colorStr) {
+      const hex = colorStr.replace('#', '').trim();
+      const parsed = parseInt(hex, 16);
+      if (!isNaN(parsed)) colorNum = parsed;
+    }
+
+    const isEmbed = title || mediaUrl || colorStr;
+    const guild = interaction.guild;
+    const sentList = [];
+
+    for (const chId of targetChannelIds) {
+      const ch = guild.channels.cache.get(chId);
+      if (!ch) continue;
+
+      try {
+        if (isEmbed) {
+          const embed = new EmbedBuilder()
+            .setColor(colorNum)
+            .setDescription(content)
+            .setFooter({ text: guild.name, iconURL: guild.iconURL() || undefined })
+            .setTimestamp();
+
+          if (title) embed.setTitle(title);
+          if (mediaUrl && (mediaUrl.startsWith('http://') || mediaUrl.startsWith('https://'))) {
+            embed.setImage(mediaUrl);
+          }
+
+          await ch.send({ embeds: [embed] });
+        } else {
+          await ch.send({ content: content });
+        }
+        sentList.push(ch.toString());
+      } catch (err) {
+        console.error(`Failed to post to ${ch.name}:`, err);
+      }
+    }
+
+    adminPendingSelections.delete(interaction.user.id);
+
+    return interaction.editReply({
+      content: `✅ **Successfully posted your message to:** ${sentList.join(', ')}!`
+    });
+  }
+
+  // B. Mass DM Submit
+  if (interaction.customId === 'modal_panel_mass_dm') {
+    await interaction.deferReply({ flags: 64 });
+
+    const title = interaction.fields.getTextInputValue('dm_title');
+    const message = interaction.fields.getTextInputValue('dm_message');
+    const mediaUrl = interaction.fields.getTextInputValue('dm_media');
+    const guild = interaction.guild;
+
+    // Fetch members
+    await interaction.editReply({ content: '⏳ Fetching member list...' });
+    let members;
+    try {
+      members = await guild.members.fetch();
+    } catch (err) {
+      return interaction.editReply({ content: '❌ Failed to fetch members: ' + err.message });
+    }
+
+    const humanMembers = members.filter(m => !m.user.bot);
+    const total = humanMembers.size;
+
+    await interaction.editReply({
+      content: `🚀 Starting Broadcast to **${total} members**.\n` +
+        `⚡ *Using safe delay (1.2s per user) to protect bot from rate limits.*\n` +
+        `Estimated completion: **~${Math.ceil((total * 1.2) / 60)} minutes**.`
+    });
+
+    const dmEmbed = new EmbedBuilder()
+      .setColor(0x5865F2)
+      .setTitle(`📢 ${title}`)
+      .setDescription(message)
+      .setFooter({ text: `${guild.name} • Official Announcement`, iconURL: guild.iconURL() || undefined })
+      .setTimestamp();
+
+    if (mediaUrl && (mediaUrl.startsWith('http://') || mediaUrl.startsWith('https://'))) {
+      dmEmbed.setImage(mediaUrl);
+    }
+
+    let sent = 0;
+    let failed = 0;
+
+    (async () => {
+      for (const [, member] of humanMembers) {
+        try {
+          await member.send({ embeds: [dmEmbed] });
+          sent++;
+        } catch (err) {
+          failed++;
+        }
+        await new Promise(r => setTimeout(r, 1200));
+      }
+
+      console.log(`📢 Dashboard Broadcast complete: ${sent} delivered, ${failed} failed.`);
+      const logChannel = client.channels.cache.get(TICKET_LOG_CHANNEL_ID);
+      if (logChannel) {
+        const report = new EmbedBuilder()
+          .setColor(0x57F287)
+          .setTitle('📬 Dashboard Mass Broadcast Completed')
+          .addFields(
+            { name: '👤 Admin', value: interaction.user.tag, inline: true },
+            { name: '📨 Delivered', value: `${sent}`, inline: true },
+            { name: '🚫 Closed DMs', value: `${failed}`, inline: true },
+            { name: '📝 Title', value: title, inline: false }
+          )
+          .setTimestamp();
+        await logChannel.send({ embeds: [report] }).catch(() => {});
+      }
+    })();
+  }
+}
+
+// ==========================================
+// --- 10. START BOT ---
 // ==========================================
 if (!process.env.DISCORD_TOKEN) {
   console.error('❌ ERROR: DISCORD_TOKEN is missing in your .env file!');
