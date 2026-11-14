@@ -1146,6 +1146,23 @@ async function handleCinemaSelect(interaction) {
 async function handleCinemaButton(interaction) {
   // 1. Open Search Modal
   if (interaction.customId === 'cinema_btn_open_search') {
+    if (!isUserVIP(interaction.member)) {
+      const noVipEmbed = new EmbedBuilder()
+        .setColor(0xED4245)
+        .setTitle('💎 VIP CINEMA // ACCESS RESTRICTED')
+        .setDescription(
+          `Hey ${interaction.user}, the **Private Cinema & Watch Party Hub** is an exclusive feature for **💎・VIP MEMBERS**!\n\n` +
+          '🌟 **VIP Perks:**\n' +
+          '• 🎬 Unlimited Movie & TV Series Streaming\n' +
+          '• 🍿 Create Private Voice Rooms for you & your friends\n' +
+          '• ⚡ Ad-Free Instant HD Streaming Players\n\n' +
+          '👉 Please click **"💎 Upgrade / Buy VIP"** or open a ticket in <#1566968095422287912> to get VIP Access!'
+        )
+        .setFooter({ text: 'NISHU STORE • VIP Lounge' });
+
+      return interaction.reply({ embeds: [noVipEmbed], flags: 64 });
+    }
+
     const modal = new ModalBuilder()
       .setCustomId('modal_cinema_search')
       .setTitle('🔍 Search VIP Movie / Series');
