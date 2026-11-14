@@ -329,6 +329,7 @@ client.once('clientReady', async () => {
   setupTicketPanel();
   setupCinemaPanel();
   setupBotTextsPanel();
+  setupStoreMenuPanel();
   registerSlashCommands();
 });
 
@@ -673,6 +674,15 @@ client.on('interactionCreate', async (interaction) => {
 
     if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_panel_')) {
       await handleDashboardModalSubmit(interaction);
+    }
+
+    // 10. Store Products & Catalog System
+    if (interaction.isButton() && interaction.customId.startsWith('store_btn_')) {
+      await handleStoreButton(interaction);
+    }
+
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('store_select_')) {
+      await handleStoreSelect(interaction);
     }
 
     if (interaction.isButton() && interaction.customId.startsWith('cinema_')) {
@@ -1811,7 +1821,259 @@ async function handleDashboardModalSubmit(interaction) {
 }
 
 // ==========================================
-// --- 10. START BOT ---
+// --- 10. PRODUCTS & DIGITAL CATALOG SYSTEM ---
+// ==========================================
+const PRODUCTS_FILE = path.join(__dirname, 'products.json');
+
+// Helper: Read products database
+function getProducts() {
+  try {
+    if (fs.existsSync(PRODUCTS_FILE)) {
+      const data = fs.readFileSync(PRODUCTS_FILE, 'utf8');
+      return JSON.parse(data);
+    }
+  } catch (err) {
+    console.error('Error reading products.json:', err);
+  }
+  return [];
+}
+
+// Setup Interactive Catalog in #💜・store-menu
+async function setupStoreMenuPanel() {
+  try {
+    const guild = client.guilds.cache.first();
+    if (!guild) return;
+
+    const storeMenuChannel = guild.channels.cache.get('1566961548470255777') || 
+      guild.channels.cache.find(c => c.name.includes('store-menu'));
+    if (!storeMenuChannel) return;
+
+    const messages = await storeMenuChannel.messages.fetch({ limit: 10 });
+    const botMsg = messages.find(m => m.author.id === client.user.id && m.embeds.length > 0 && m.embeds[0].title?.includes('DIGITAL STORE CATALOG'));
+    if (botMsg) {
+      console.log('📌 Store Catalog Panel already exists in #store-menu.');
+      return;
+    }
+
+    const products = getProducts();
+
+    const catalogEmbed = new EmbedBuilder()
+      .setColor(0x8B5CF6)
+      .setTitle('🛍️ NISHU STORE // OFFICIAL DIGITAL STORE CATALOG')
+      .setDescription(
+        'Welcome to **NISHU STORE | PREMIUM DIGITAL**! 💜\n\n' +
+        'Browse our verified collection of premium streaming accounts, creative tools, AI suites, and software licenses.\n\n' +
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+        '**🌟 WHY BUY FROM NISHU STORE?**\n' +
+        '• ⚡ **Instant Delivery:** Get credentials within 5-15 minutes.\n' +
+        '• 🛡️ **Guaranteed Warranty:** 100% full replacement warranty on all products.\n' +
+        '• 💳 **Easy Payments:** Bank Transfers, FriMi, eZ Cash, Binance USDT & Card.\n\n' +
+        '👇 **Select a product below to view pricing, full specs & order instantly:**'
+      )
+      .setImage('https://dummyimage.com/800x140/1e1b4b/a855f7&text=NISHU+STORE+•+PREMIUM+DIGITAL+CATALOG')
+      .setFooter({ text: 'NISHU STORE • 24/7 Automated Order Desk' });
+
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId('store_select_product')
+      .setPlaceholder('🛒 Choose a product to view details & buy...');
+
+    products.forEach(p => {
+      selectMenu.addOptions({
+        label: p.name.slice(0, 70),
+        description: `${p.priceLKR} (${p.priceUSD}) • ${p.delivery}`,
+        value: p.id,
+        emoji: p.categoryEmoji || '🛍️'
+      });
+    });
+
+    const row = new ActionRowBuilder().addComponents(selectMenu);
+
+    await storeMenuChannel.send({ embeds: [catalogEmbed], components: [row] });
+    console.log('✅ Posted Interactive Store Menu Catalog in #store-menu!');
+  } catch (err) {
+    console.error('Error in setupStoreMenuPanel:', err);
+  }
+}
+
+// 1. Handle Product Selection from Store Menu
+async function handleStoreSelect(interaction) {
+  if (interaction.customId === 'store_select_product') {
+    const productId = interaction.values[0];
+    const products = getProducts();
+    const product = products.find(p => p.id === productId);
+
+    if (!product) {
+      return interaction.reply({ content: '❌ Product not found.', flags: 64 });
+    }
+
+    const productEmbed = new EmbedBuilder()
+      .setColor(0x10B981)
+      .setTitle(`${product.categoryEmoji || '🛍️'} ${product.name}`)
+      .setDescription(
+        `📂 **Category:** \`${product.category}\`\n\n` +
+        `💰 **Price (LKR):** **${product.priceLKR}**\n` +
+        `💵 **Price (USD / Crypto):** **${product.priceUSD}**\n` +
+        `⏱️ **Delivery Speed:** \`${product.delivery}\`\n` +
+        `🛡️ **Warranty:** \`${product.warranty}\`\n` +
+        `📦 **Availability:** ${product.inStock ? '🟢 **In Stock (Ready to Deliver)**' : '🔴 **Out of Stock**'}\n\n` +
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+        `**📝 Product Highlights:**\n${product.description}\n\n` +
+        '👇 *Click "🛒 Buy / Order Now" below to open your instant private order ticket!*'
+      )
+      .setFooter({ text: `Product ID: ${product.id} • NISHU STORE` });
+
+    if (product.image) {
+      productEmbed.setImage(product.image);
+    }
+
+    const btnRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`store_btn_buy_${product.id}`)
+        .setLabel(`Buy Now • ${product.priceLKR}`)
+        .setEmoji('🛒')
+        .setStyle(ButtonStyle.Success)
+        .setDisabled(!product.inStock),
+      new ButtonBuilder()
+        .setLabel('💳 Payment Methods')
+        .setStyle(ButtonStyle.Link)
+        .setURL('https://discord.com/channels/' + interaction.guild.id + '/1566962312512933968')
+    );
+
+    return interaction.reply({
+      embeds: [productEmbed],
+      components: [btnRow],
+      flags: 64
+    });
+  }
+}
+
+// 2. Handle Buy Button Click (Create dedicated order ticket)
+async function handleStoreButton(interaction) {
+  if (interaction.customId.startsWith('store_btn_buy_')) {
+    await interaction.deferReply({ flags: 64 });
+
+    const productId = interaction.customId.replace('store_btn_buy_', '');
+    const products = getProducts();
+    const product = products.find(p => p.id === productId);
+
+    const guild = interaction.guild;
+    const user = interaction.user;
+
+    // Check if user already has an open ticket
+    const existingChannel = guild.channels.cache.find(c => 
+      c.parentId === TICKET_CATEGORY_ID && 
+      c.topic && 
+      c.topic.includes(user.id)
+    );
+
+    if (existingChannel) {
+      return interaction.editReply({
+        content: `⚠️ You already have an open ticket in ${existingChannel}! Please complete your order there.`
+      });
+    }
+
+    const prodShortName = product ? product.name.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 10) : 'order';
+    const channelName = `🛒・${prodShortName}-${user.username.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 10)}`;
+
+    try {
+      const orderChannel = await guild.channels.create({
+        name: channelName,
+        type: ChannelType.GuildText,
+        parent: TICKET_CATEGORY_ID,
+        topic: `Customer: ${user.tag} (${user.id}) | Product: ${product ? product.name : 'Custom Order'}`,
+        permissionOverwrites: [
+          {
+            id: guild.roles.everyone.id,
+            deny: [PermissionFlagsBits.ViewChannel]
+          },
+          {
+            id: user.id,
+            allow: [
+              PermissionFlagsBits.ViewChannel,
+              PermissionFlagsBits.SendMessages,
+              PermissionFlagsBits.AttachFiles,
+              PermissionFlagsBits.ReadMessageHistory
+            ]
+          },
+          ...STAFF_ROLE_IDS.map(roleId => ({
+            id: roleId,
+            allow: [
+              PermissionFlagsBits.ViewChannel,
+              PermissionFlagsBits.SendMessages,
+              PermissionFlagsBits.AttachFiles,
+              PermissionFlagsBits.ReadMessageHistory
+            ]
+          }))
+        ]
+      });
+
+      // Staff ping mentions
+      const staffPings = STAFF_ROLE_IDS.map(id => `<@&${id}>`).join(' ');
+
+      const orderEmbed = new EmbedBuilder()
+        .setColor(0x57F287)
+        .setTitle('🛒 NEW ORDER TICKET // NISHU STORE')
+        .setDescription(
+          `👋 Welcome ${user}! Thank you for choosing **NISHU STORE**.\n\n` +
+          `🛍️ **Selected Product:** **${product ? product.name : 'Custom Order'}**\n` +
+          `💰 **Total Due:** **${product ? product.priceLKR + ' (' + product.priceUSD + ')' : 'See Pricing'}**\n` +
+          `⏱️ **Estimated Delivery:** \`${product ? product.delivery : '5-15 Mins'}\`\n` +
+          `🛡️ **Warranty:** \`${product ? product.warranty : 'Guaranteed'}\`\n\n` +
+          '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+          '**💳 ACCEPTED PAYMENT OPTIONS:**\n' +
+          '• **Bank Transfer:** Commercial Bank, Sampath, BOC, HNB\n' +
+          '• **Mobile Wallets:** FriMi / eZ Cash / Genie / Koko\n' +
+          '• **Crypto:** Binance Pay USDT / LTC / BTC\n' +
+          '• **Card / PayPal:** Available upon request\n\n' +
+          '📝 **Next Steps:**\n' +
+          '1. Inform our staff below how you would like to pay.\n' +
+          '2. Once payment details are sent, upload your payment receipt/screenshot here.\n' +
+          '3. Our staff will immediately verify and deliver your login credentials/key!'
+        )
+        .setFooter({ text: 'NISHU STORE • Fast & Reliable Digital Delivery' })
+        .setTimestamp();
+
+      const orderRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('ticket_close')
+          .setLabel('Close Order Ticket')
+          .setEmoji('🔒')
+          .setStyle(ButtonStyle.Danger)
+      );
+
+      await orderChannel.send({ 
+        content: `👋 Hey ${user}! ${staffPings} A new customer is ready to buy!`,
+        embeds: [orderEmbed], 
+        components: [orderRow] 
+      });
+
+      // Log order creation in staff log
+      const logChannel = client.channels.cache.get(TICKET_LOG_CHANNEL_ID);
+      if (logChannel) {
+        const orderLog = new EmbedBuilder()
+          .setColor(0x10B981)
+          .setTitle('🛍️ New Order Ticket Opened')
+          .addFields(
+            { name: '👤 Customer', value: `${user.tag} (${user.id})`, inline: true },
+            { name: '📦 Product', value: product ? product.name : 'Unknown', inline: true },
+            { name: '💬 Channel', value: orderChannel.toString(), inline: false }
+          )
+          .setTimestamp();
+        await logChannel.send({ embeds: [orderLog] }).catch(() => {});
+      }
+
+      return interaction.editReply({
+        content: `🎉 **Your Order Ticket has been created!** Please proceed to ${orderChannel} to complete your payment and receive your product.`
+      });
+    } catch (err) {
+      console.error('Error creating order channel:', err);
+      return interaction.editReply({ content: '❌ Failed to create order ticket: ' + err.message });
+    }
+  }
+}
+
+// ==========================================
+// --- 11. START BOT ---
 // ==========================================
 if (!process.env.DISCORD_TOKEN) {
   console.error('❌ ERROR: DISCORD_TOKEN is missing in your .env file!');

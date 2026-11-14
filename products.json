@@ -1,0 +1,93 @@
+[
+  {
+    "id": "netflix_1m",
+    "name": "Netflix UHD 4K (1 Month)",
+    "category": "Streaming",
+    "categoryEmoji": "🎬",
+    "priceLKR": "Rs. 550",
+    "priceUSD": "$1.80",
+    "delivery": "⚡ 5-15 Minutes",
+    "warranty": "🛡️ 30 Days Full Replacement",
+    "inStock": true,
+    "description": "• Ultra HD 4K Quality (All devices supported)\n• Private profile with custom PIN lock\n• No interruptions, legitimate renewal warranty",
+    "image": "https://dummyimage.com/600x300/141414/e50914&text=NETFLIX+UHD+4K+•+PREMIUM"
+  },
+  {
+    "id": "yt_premium_12m",
+    "name": "YouTube Premium (12 Months)",
+    "category": "Streaming",
+    "categoryEmoji": "🎬",
+    "priceLKR": "Rs. 1,450",
+    "priceUSD": "$4.80",
+    "delivery": "⚡ Instant Invite",
+    "warranty": "🛡️ 1 Year Full Warranty",
+    "inStock": true,
+    "description": "• Ad-free YouTube & background play\n• YouTube Music Premium included\n• Activated on your own personal Google account",
+    "image": "https://dummyimage.com/600x300/282828/ff0000&text=YOUTUBE+PREMIUM+•+1+YEAR"
+  },
+  {
+    "id": "spotify_12m",
+    "name": "Spotify Premium (12 Months)",
+    "category": "Streaming",
+    "categoryEmoji": "🎬",
+    "priceLKR": "Rs. 1,200",
+    "priceUSD": "$4.00",
+    "delivery": "⚡ 5-10 Minutes",
+    "warranty": "🛡️ 1 Year Guaranteed Warranty",
+    "inStock": true,
+    "description": "• Unlimited skips & High Quality 320kbps audio\n• Offline song downloads\n• Private upgraded account",
+    "image": "https://dummyimage.com/600x300/121212/1db954&text=SPOTIFY+PREMIUM+•+12+MONTHS"
+  },
+  {
+    "id": "canva_pro_life",
+    "name": "Canva Pro (Lifetime / 1 Year)",
+    "category": "Creative & Design",
+    "categoryEmoji": "🎨",
+    "priceLKR": "Rs. 450",
+    "priceUSD": "$1.50",
+    "delivery": "⚡ Instant Access",
+    "warranty": "🛡️ Lifetime / 1 Year",
+    "inStock": true,
+    "description": "• 100M+ premium stock photos, videos & graphics\n• Magic Studio AI design tools & Brand Kit\n• Upgraded on your personal email",
+    "image": "https://dummyimage.com/600x300/00c4cc/7d2ae8&text=CANVA+PRO+•+LIFETIME"
+  },
+  {
+    "id": "chatgpt_plus",
+    "name": "ChatGPT Plus (GPT-4o Access)",
+    "category": "AI & Productivity",
+    "categoryEmoji": "🤖",
+    "priceLKR": "Rs. 950",
+    "priceUSD": "$3.20",
+    "delivery": "⚡ Instant Credentials",
+    "warranty": "🛡️ 30 Days Warranty",
+    "inStock": true,
+    "description": "• Access to GPT-4o, DALL-E 3 image generator\n• Custom GPTs & Advanced Data Analysis\n• Fast response times & no limits",
+    "image": "https://dummyimage.com/600x300/202123/10a37f&text=CHATGPT+PLUS+•+GPT-4o"
+  },
+  {
+    "id": "nordvpn_1y",
+    "name": "NordVPN / Surfshark (1 Year)",
+    "category": "VPN & Security",
+    "categoryEmoji": "🔐",
+    "priceLKR": "Rs. 600",
+    "priceUSD": "$2.00",
+    "delivery": "⚡ 5-15 Minutes",
+    "warranty": "🛡️ 1 Year Replacement Warranty",
+    "inStock": true,
+    "description": "• 5,000+ ultra-fast global servers\n• Unlimited bandwidth, streaming & torrenting\n• Works on Windows, Mac, Android, iOS",
+    "image": "https://dummyimage.com/600x300/0f172a/38bdf8&text=NORDVPN+•+1+YEAR+SECURE"
+  },
+  {
+    "id": "win11_pro",
+    "name": "Windows 11 Pro Retail License Key",
+    "category": "Software & Keys",
+    "categoryEmoji": "💻",
+    "priceLKR": "Rs. 850",
+    "priceUSD": "$2.80",
+    "delivery": "⚡ Instant Digital Code",
+    "warranty": "🛡️ Lifetime Activation Guarantee",
+    "inStock": true,
+    "description": "• 100% Genuine Retail Product Key (32/64 bit)\n• Lifetime activation & official Microsoft updates\n• Direct online activation",
+    "image": "https://dummyimage.com/600x300/0078d4/ffffff&text=WINDOWS+11+PRO+•+LIFETIME"
+  }
+]
