@@ -326,12 +326,66 @@ client.once('clientReady', async () => {
 
   setupRolesChannelPanel();
   setupTicketPanel();
+  setupCinemaPanel();
   registerSlashCommands();
 });
 
 client.once('ready', () => {
   console.log(`✅ Connected and ready as ${client.user.tag}!`);
 });
+
+// Setup VIP Cinema Panel in #🎬・vip-cinema
+async function setupCinemaPanel() {
+  try {
+    const guild = client.guilds.cache.first();
+    if (!guild) return;
+    const cinemaChannel = guild.channels.cache.find(c => c.name.includes('vip-cinema'));
+    if (!cinemaChannel) return;
+
+    const messages = await cinemaChannel.messages.fetch({ limit: 10 });
+    const botMsg = messages.find(m => m.author.id === client.user.id && m.embeds.length > 0 && m.embeds[0].title?.includes('VIP CINEMA'));
+    if (botMsg) {
+      console.log('📌 VIP Cinema Panel already exists in #vip-cinema.');
+      return;
+    }
+
+    const cinemaEmbed = new EmbedBuilder()
+      .setColor(0x9333EA)
+      .setTitle('🎬 NISHU VIP CINEMA // PRIVATE WATCH PARTY LOUNGE')
+      .setDescription(
+        'Welcome to **NISHU STORE\'s Official Virtual Cinema**! 🍿\n\n' +
+        'An exclusive high-speed entertainment hub for movie lovers, series bingers, and private watch parties with friends.\n\n' +
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+        '**🌟 VIP CINEMA FEATURES:**\n' +
+        '• 🎬 **Unlimited Library:** Access over 50,000+ Movies & TV Series in 1080p / 4K.\n' +
+        '• 🍿 **Private Watch Parties:** Spawn your own Private Voice Cinema room & invite friends to watch together.\n' +
+        '• ⚡ **Ad-Free Streaming:** Clean, fast multi-server streaming with zero popups.\n' +
+        '• 🔍 **Interactive Search:** Find any Hollywood, Bollywood, Anime, or Netflix title in seconds.\n\n' +
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+        '**💎 HOW TO ACCESS / BUY VIP:**\n' +
+        'If you already have the **💎・VIP MEMBER** role, click **"VIP: Search & Play"** below.\n\n' +
+        '🔒 **Don\'t have VIP yet?**\n' +
+        'Upgrade your account today to unlock full VIP Cinema access, custom private rooms and premium perks! Click **"💎 Upgrade / Buy VIP"** below to open an instant order ticket!'
+      )
+      .setFooter({ text: 'NISHU STORE • Premium Entertainment' });
+
+    const actionRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('cinema_btn_open_search')
+        .setLabel('🍿 VIP: Search & Play Movie')
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setLabel('💎 Upgrade / Buy VIP')
+        .setStyle(ButtonStyle.Link)
+        .setURL('https://discord.com/channels/' + guild.id + '/1566968095422287912')
+    );
+
+    await cinemaChannel.send({ embeds: [cinemaEmbed], components: [actionRow] });
+    console.log('✅ Posted VIP Cinema panel in #vip-cinema!');
+  } catch (err) {
+    console.error('Error in setupCinemaPanel:', err);
+  }
+}
 
 // Setup Main Role & Security Panel in #choose-your-roles
 async function setupRolesChannelPanel() {
