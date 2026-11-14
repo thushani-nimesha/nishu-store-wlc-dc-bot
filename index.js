@@ -1228,50 +1228,32 @@ async function handleCinemaButton(interaction) {
 
       activeCinemaRooms.set(cinemaRoom.id, { ownerId: user.id, guildId: guild.id });
 
-      // Generate Native Discord In-App Watch Together Activity Invite
-      let activityUrl = null;
-      try {
-        const invite = await cinemaRoom.createInvite({
-          targetApplication: '755600276941176913', // Official Discord Watch Together Activity
-          targetType: 2, // Embedded Application
-          maxAge: 7200
-        });
-        activityUrl = invite.url;
-      } catch (actErr) {
-        console.warn('Activity invite fallback:', actErr.message);
-      }
+      const streamUrl1 = `https://vidsrc.to/embed/movie/${imdbID}`;
+      const streamUrl2 = `https://autoembed.to/movie/imdb/${imdbID}`;
 
       const roomCreatedEmbed = new EmbedBuilder()
         .setColor(0x57F287)
         .setTitle('🍿 PRIVATE CINEMA ROOM CREATED!')
         .setDescription(
           `🎉 Your Private Watch Party Room is ready: ${cinemaRoom}!\n\n` +
-          '**📺 How to Watch Inside Discord (No External Sites):**\n' +
-          '1️⃣ **Join your room:** Click on ' + cinemaRoom.toString() + ' to enter the voice channel.\n' +
-          '2️⃣ **Launch Watch Together:** Click the green **"🚀 Launch Watch Party Screen"** button below!\n' +
-          '3️⃣ Discord will open the synchronized cinema screen directly inside your voice channel.\n' +
-          '4️⃣ You can invite your friends to this room to watch together in real-time!\n\n' +
-          '🧹 *This room will automatically delete after everyone leaves.*'
+          '**📺 How to Watch with Friends:**\n' +
+          '1️⃣ **Join Your Room:** Click ' + cinemaRoom.toString() + ' to connect to voice.\n' +
+          '2️⃣ **Open Movie Stream:** Click **"▶️ Watch Movie Stream (HD)"** below to open the movie.\n' +
+          '3️⃣ **Stream to Friends:** In your voice channel, click **"Share Your Screen"** to stream it directly to everyone in your cinema room!\n' +
+          '4️⃣ **Invite Friends:** Right-click the voice channel and invite any server friend to join your watch party.\n\n' +
+          '🧹 *This room will automatically delete when everyone leaves.*'
         )
-        .setFooter({ text: 'NISHU VIP Cinema • Pure Discord In-App Experience' });
+        .setFooter({ text: 'NISHU VIP Cinema • Private Watch Party' });
 
-      const buttonRow = new ActionRowBuilder();
-
-      if (activityUrl) {
-        buttonRow.addComponents(
-          new ButtonBuilder()
-            .setLabel('🚀 Launch Watch Party Screen')
-            .setStyle(ButtonStyle.Link)
-            .setURL(activityUrl)
-        );
-      }
-
-      // Also add fallback direct stream link
-      buttonRow.addComponents(
+      const buttonRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-          .setLabel('▶️ Backup Stream Link')
+          .setLabel('▶️ Watch Movie Stream (HD)')
           .setStyle(ButtonStyle.Link)
-          .setURL(`https://vidsrc.to/embed/movie/${imdbID}`)
+          .setURL(streamUrl1),
+        new ButtonBuilder()
+          .setLabel('▶️ Backup Stream Player')
+          .setStyle(ButtonStyle.Link)
+          .setURL(streamUrl2)
       );
 
       return interaction.editReply({ embeds: [roomCreatedEmbed], components: [buttonRow] });
