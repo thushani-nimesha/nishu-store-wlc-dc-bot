@@ -4607,6 +4607,8 @@ async function handleMusicPlayCommand(interaction) {
     let song = null;
 
     // Check if input is a valid URL or a search query
+    const isValidUrl = query.startsWith('http://') || query.startsWith('https://');
+
     // Helper: Extract YouTube ID from any link
     function extractVideoId(url) {
       const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
