@@ -2221,13 +2221,6 @@ async function setupStoreMenuPanel() {
       guild.channels.cache.find(c => c.name.includes('store-menu'));
     if (!storeMenuChannel) return;
 
-    const messages = await storeMenuChannel.messages.fetch({ limit: 10 });
-    const botMsg = messages.find(m => m.author.id === client.user.id && m.embeds.length > 0 && m.embeds[0].title?.includes('DIGITAL STORE CATALOG'));
-    if (botMsg) {
-      console.log('📌 Store Catalog Panel already exists in #store-menu.');
-      return;
-    }
-
     const products = getProducts();
 
     const catalogEmbed = new EmbedBuilder()
@@ -2235,7 +2228,7 @@ async function setupStoreMenuPanel() {
       .setTitle('🛍️ NISHU STORE // OFFICIAL DIGITAL STORE CATALOG')
       .setDescription(
         'Welcome to **NISHU STORE | PREMIUM DIGITAL**! 💜\n\n' +
-        'Browse our verified collection of premium streaming accounts, creative tools, AI suites, and software licenses.\n\n' +
+        'Browse our verified collection of premium AI accounts, free data VPN tunnels, Canva suites, and YouTube watch hours.\n\n' +
         '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
         '**🌟 WHY BUY FROM NISHU STORE?**\n' +
         '• ⚡ **Instant Delivery:** Get credentials within 5-15 minutes.\n' +
@@ -2260,6 +2253,14 @@ async function setupStoreMenuPanel() {
     });
 
     const row = new ActionRowBuilder().addComponents(selectMenu);
+
+    const messages = await storeMenuChannel.messages.fetch({ limit: 10 });
+    const botMsg = messages.find(m => m.author.id === client.user.id && m.embeds.length > 0 && m.embeds[0].title?.includes('DIGITAL STORE CATALOG'));
+    if (botMsg) {
+      await botMsg.edit({ embeds: [catalogEmbed], components: [row] });
+      console.log('🔄 Updated existing Store Catalog Panel in #store-menu with fresh items & prices!');
+      return;
+    }
 
     await storeMenuChannel.send({ embeds: [catalogEmbed], components: [row] });
     console.log('✅ Posted Interactive Store Menu Catalog in #store-menu!');
