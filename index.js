@@ -1972,7 +1972,13 @@ async function handleCinemaButton(interaction) {
           },
           {
             id: VIP_ROLE_ID,
-            allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect]
+            allow: [
+              PermissionFlagsBits.ViewChannel,
+              PermissionFlagsBits.Connect,
+              PermissionFlagsBits.Speak,
+              PermissionFlagsBits.Stream,
+              PermissionFlagsBits.UseVAD
+            ]
           }
         ]
       });
