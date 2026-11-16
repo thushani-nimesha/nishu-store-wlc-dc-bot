@@ -822,6 +822,10 @@ client.on('interactionCreate', async (interaction) => {
       await handleInviteRankCommand(interaction);
     }
 
+    if (interaction.isChatInputCommand() && interaction.commandName === 'staff') {
+      await handleStaffCommand(interaction);
+    }
+
     // Invite & Win Panel Interactive Buttons
     if (interaction.isButton() && interaction.customId === 'btn_get_my_invite_link') {
       await handleGetMyInviteLink(interaction);
@@ -1420,7 +1424,10 @@ async function registerSlashCommands() {
         ),
       new SlashCommandBuilder()
         .setName('inviterank')
-        .setDescription('🏆 View top 10 members with the most server invites')
+        .setDescription('🏆 View top 10 members with the most server invites'),
+      new SlashCommandBuilder()
+        .setName('staff')
+        .setDescription('👥 Check active staff & Finance Managers in Nishu Store')
     ];
 
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
@@ -3538,6 +3545,39 @@ async function handleGetMyInviteLink(interaction) {
     return interaction.editReply({
       content: '❌ Failed to generate invite link! Please check if the bot has "Create Instant Invite" permission.'
     });
+  }
+}
+
+async function handleStaffCommand(interaction) {
+  await interaction.deferReply();
+  try {
+    const guild = interaction.guild;
+    await guild.members.fetch(); // Ensure full member cache
+
+    // Find Finance Managers Role
+    const financeRole = guild.roles.cache.find(r => 
+      r.name.toLowerCase().includes('finance manager') || r.name.toLowerCase().includes('finance')
+    );
+
+    const financeMembers = financeRole ? financeRole.members.map(m => `• <@${m.id}> (\`${m.user.tag}\`)`) : [];
+
+    const embed = new EmbedBuilder()
+      .setColor(0x10B981)
+      .setTitle('👥 NISHU STORE // OFFICIAL STAFF & FINANCE TEAM')
+      .setDescription(
+        'Here is the verified list of members who handle store orders, payments, and receipts:\n\n' +
+        `💳 **Finance Managers (${financeMembers.length}):**\n` +
+        (financeMembers.length > 0 ? financeMembers.join('\n') : '*No members currently assigned to this role.*') + '\n\n' +
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+        '💡 *Need to make a payment or verify an order? Only trust members with this role!*'
+      )
+      .setFooter({ text: 'NISHU STORE • Staff Verification' })
+      .setTimestamp();
+
+    return interaction.editReply({ embeds: [embed] });
+  } catch (err) {
+    console.error('Error in handleStaffCommand:', err);
+    return interaction.editReply({ content: '❌ Failed to fetch staff list: ' + err.message });
   }
 }
 
