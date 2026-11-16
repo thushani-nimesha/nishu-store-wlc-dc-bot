@@ -35,7 +35,7 @@ const {
   entersState
 } = require('@discordjs/voice');
 const ytdl = require('@distube/ytdl-core');
-const YouTube = require('youtube-sr').default;
+const ytSearch = require('yt-search');
 
 // --- 0. REGISTER MODERN SLEEK TYPOGRAPHY ---
 const winFonts = path.join(process.env.WINDIR || 'C:\\Windows', 'Fonts');
@@ -4627,14 +4627,15 @@ async function handleMusicPlayCommand(interaction) {
     }
 
     if (!song) {
-      // Use YouTube Search (youtube-sr)
-      const searchResult = await YouTube.searchOne(query).catch(() => null);
-      if (searchResult) {
+      // Use Ultra-Fast yt-search
+      const searchRes = await ytSearch(query).catch(() => null);
+      if (searchRes && searchRes.videos && searchRes.videos.length > 0) {
+        const video = searchRes.videos[0];
         song = {
-          title: searchResult.title,
-          url: searchResult.url,
-          durationRaw: searchResult.durationFormatted,
-          thumbnail: searchResult.thumbnail?.url,
+          title: video.title,
+          url: video.url,
+          durationRaw: video.timestamp || 'Unknown',
+          thumbnail: video.thumbnail || video.image,
           requesterId: interaction.user.id
         };
       }
