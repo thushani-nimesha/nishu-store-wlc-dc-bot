@@ -1743,12 +1743,24 @@ async function registerSlashCommands() {
     ];
 
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
-    console.log('🔄 Registering VIP Cinema Slash Commands...');
+    console.log('🔄 Registering Slash Commands...');
+
+    // 1. Fast Guild-level registration for instantaneous update
+    const guild = client.guilds.cache.first();
+    if (guild) {
+      await rest.put(
+        Routes.applicationGuildCommands(client.user.id, guild.id),
+        { body: commands }
+      );
+      console.log(`⚡ Instant Guild Slash Commands registered for ${guild.name}!`);
+    }
+
+    // 2. Global registration
     await rest.put(
       Routes.applicationCommands(client.user.id),
       { body: commands }
     );
-    console.log('✅ Successfully registered VIP Cinema slash commands!');
+    console.log('✅ Successfully registered global slash commands!');
   } catch (err) {
     console.error('Error registering slash commands:', err);
   }
