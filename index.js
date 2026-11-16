@@ -4605,19 +4605,26 @@ async function handleMusicPlayCommand(interaction) {
     const isValidUrl = query.startsWith('http://') || query.startsWith('https://');
 
     if (isValidUrl) {
-      const urlType = await play.validate(query);
-      if (urlType === 'yt_video' || urlType === 'so_track') {
-        const info = await play.video_basic_info(query);
-        song = {
-          title: info.video_details.title,
-          url: info.video_details.url,
-          durationRaw: info.video_details.durationRaw,
-          thumbnail: info.video_details.thumbnails[0]?.url,
-          requesterId: interaction.user.id
-        };
-      } else {
-        // Fallback search if unsupported URL
-        const searchResults = await play.search(query, { limit: 1 });
+      try {
+        const urlType = await play.validate(query);
+        if (urlType === 'yt_video' || query.includes('youtu.be') || query.includes('youtube.com')) {
+          const info = await play.video_basic_info(query).catch(() => null);
+          if (info && info.video_details) {
+            song = {
+              title: info.video_details.title,
+              url: info.video_details.url,
+              durationRaw: info.video_details.durationRaw,
+              thumbnail: info.video_details.thumbnails[0]?.url,
+              requesterId: interaction.user.id
+            };
+          }
+        }
+      } catch (e) {
+        console.warn('URL validate error, falling back to search:', e.message);
+      }
+
+      if (!song) {
+        const searchResults = await play.search(query, { limit: 1 }).catch(() => []);
         if (searchResults && searchResults.length > 0) {
           const item = searchResults[0];
           song = {
