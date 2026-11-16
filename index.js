@@ -1346,24 +1346,33 @@ async function handleTicketClose(interaction) {
     const transcriptBuffer = Buffer.from(transcriptText, 'utf-8');
     const transcriptAttachment = new AttachmentBuilder(transcriptBuffer, { name: `transcript-${channel.name}.txt` });
 
-    // 2. Send transcript to Customer DM if ticket owner found
+    // 2. Send transcript & Review prompt to Customer DM if ticket owner found
     if (ticketOwnerId) {
       try {
         const ownerUser = await client.users.fetch(ticketOwnerId);
         if (ownerUser) {
           const dmCloseEmbed = new EmbedBuilder()
             .setColor(0x8B5CF6)
-            .setTitle('📦 TICKET CLOSED // YOUR TRANSCRIPT RECEIPT')
+            .setTitle('📦 TICKET CLOSED // YOUR TRANSCRIPT & REVIEW')
             .setDescription(
               `Hello ${ownerUser.username}!\n\n` +
               `Your ticket **#${channel.name}** in **NISHU STORE** has been closed.\n\n` +
               `📄 We have attached the complete conversation history & receipt for your records.\n\n` +
-              `Thank you for trusting **NISHU STORE**! 💜`
+              `⭐ **How was your shopping experience?**\n` +
+              `Click the **"Leave a Review (⭐)"** button below to rate us and share your feedback!`
             )
             .setFooter({ text: 'NISHU STORE • Automated Order Records' })
             .setTimestamp();
 
-          await ownerUser.send({ embeds: [dmCloseEmbed], files: [transcriptAttachment] });
+          const dmReviewRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setCustomId(`btn_leave_vouch_${ownerUser.id}`)
+              .setLabel('Leave a Review (⭐)')
+              .setEmoji('⭐')
+              .setStyle(ButtonStyle.Success)
+          );
+
+          await ownerUser.send({ embeds: [dmCloseEmbed], components: [dmReviewRow], files: [transcriptAttachment] }).catch(() => {});
         }
       } catch (dmErr) {
         console.warn('Could not send transcript to customer DM:', dmErr.message);
