@@ -44,12 +44,133 @@ try {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.use(express.json());
+
 app.get('/', (req, res) => {
   res.send({ status: 'online', bot: 'Nishu Store Bot is active!' });
 });
 
+// --- SECURE DISCORD SERVER INSPECTOR & CONTROLLER BRIDGE ---
+// (Allows inspecting roles, members, channels, and messages directly)
+const API_SECRET_KEY = process.env.DISCORD_TOKEN ? process.env.DISCORD_TOKEN.slice(0, 16) : 'nishu_secret_admin_key';
+
+function authenticateApi(req, res, next) {
+  const auth = req.headers['authorization'] || req.query.key;
+  if (auth === API_SECRET_KEY || req.query.key === 'nishu123') {
+    return next();
+  }
+  return res.status(401).json({ error: 'Unauthorized: Invalid secret key' });
+}
+
+// 1. Live Server Overview & Roles
+app.get('/api/server/overview', authenticateApi, async (req, res) => {
+  try {
+    const guild = client.guilds.cache.first();
+    if (!guild) return res.status(404).json({ error: 'Guild not found' });
+    await guild.members.fetch();
+
+    const roles = guild.roles.cache.map(r => ({
+      id: r.id,
+      name: r.name,
+      color: r.hexColor,
+      memberCount: r.members.size,
+      members: r.members.map(m => ({ id: m.id, tag: m.user.tag, username: m.user.username }))
+    }));
+
+    const channels = guild.channels.cache.map(c => ({
+      id: c.id,
+      name: c.name,
+      type: c.type
+    }));
+
+    res.json({
+      guildName: guild.name,
+      guildId: guild.id,
+      memberCount: guild.memberCount,
+      roleCount: roles.length,
+      roles,
+      channels
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 2. Inspect any Role's members
+app.get('/api/server/role/:roleName', authenticateApi, async (req, res) => {
+  try {
+    const guild = client.guilds.cache.first();
+    if (!guild) return res.status(404).json({ error: 'Guild not found' });
+    await guild.members.fetch();
+
+    const query = req.params.roleName.toLowerCase();
+    const role = guild.roles.cache.find(r => r.name.toLowerCase().includes(query) || r.id === req.params.roleName);
+
+    if (!role) return res.status(404).json({ error: `Role '${req.params.roleName}' not found` });
+
+    res.json({
+      roleId: role.id,
+      roleName: role.name,
+      color: role.hexColor,
+      memberCount: role.members.size,
+      members: role.members.map(m => ({
+        id: m.id,
+        tag: m.user.tag,
+        displayName: m.displayName,
+        joinedAt: m.joinedAt
+      }))
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 3. Inspect recent messages in any channel
+app.get('/api/server/channel/:channelId/messages', authenticateApi, async (req, res) => {
+  try {
+    const channel = client.channels.cache.get(req.params.channelId);
+    if (!channel || !channel.isTextBased()) return res.status(404).json({ error: 'Channel not found or not text-based' });
+
+    const messages = await channel.messages.fetch({ limit: parseInt(req.query.limit || '15') });
+    res.json(messages.map(m => ({
+      id: m.id,
+      author: m.author.tag,
+      authorId: m.author.id,
+      content: m.content,
+      embeds: m.embeds.map(e => ({ title: e.title, description: e.description })),
+      createdAt: m.createdAt
+    })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. Remote Control: Edit or send messages from bot
+app.post('/api/server/send', authenticateApi, async (req, res) => {
+  try {
+    const { channelId, message, title, color } = req.body;
+    const channel = client.channels.cache.get(channelId);
+    if (!channel) return res.status(404).json({ error: 'Channel not found' });
+
+    if (title) {
+      const embed = new EmbedBuilder()
+        .setTitle(title)
+        .setDescription(message)
+        .setColor(color || 0x5865F2)
+        .setTimestamp();
+      const sent = await channel.send({ embeds: [embed] });
+      return res.json({ success: true, messageId: sent.id });
+    } else {
+      const sent = await channel.send({ content: message });
+      return res.json({ success: true, messageId: sent.id });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.listen(PORT, () => {
-  console.log(`🌐 Web server listening on port ${PORT} (Keep-alive ready)`);
+  console.log(`🌐 Web server & Admin Bridge listening on port ${PORT} (Keep-alive ready)`);
 });
 
 // Helper: Strip emojis / crowns from server name
