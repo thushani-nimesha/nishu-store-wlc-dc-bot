@@ -318,6 +318,7 @@ const client = new Client({
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.MessageContent,
   ],
 });
 
@@ -330,7 +331,10 @@ client.once('clientReady', async () => {
   setupCinemaPanel();
   setupBotTextsPanel();
   setupStoreMenuPanel();
+  setupInviteRewardsPanel();
   registerSlashCommands();
+  initGiveaways();
+  loadServerInvites();
 });
 
 client.once('ready', () => {
@@ -431,12 +435,125 @@ async function setupRolesChannelPanel() {
   }
 }
 
+// Setup Official Invite & Win Rewards Panel in #🎁・invite-rewards
+async function setupInviteRewardsPanel() {
+  try {
+    const guild = client.guilds.cache.first();
+    if (!guild) return;
+
+    let inviteChannel = null;
+    if (process.env.INVITE_REWARDS_CHANNEL_ID) {
+      inviteChannel = guild.channels.cache.get(process.env.INVITE_REWARDS_CHANNEL_ID);
+    }
+    if (!inviteChannel) {
+      inviteChannel = guild.channels.cache.find(c =>
+        c.name.includes('invite-rewards') || c.name.includes('invite-and-win') || c.name.includes('invites')
+      );
+    }
+
+    // Auto-create channel if it doesn't exist!
+    if (!inviteChannel) {
+      console.log('🛠️ Creating #🎁・invite-rewards channel automatically...');
+      try {
+        inviteChannel = await guild.channels.create({
+          name: '🎁・invite-rewards',
+          type: ChannelType.GuildText,
+          topic: 'Invite friends to Nishu Store and claim exclusive rewards & nitro!',
+          permissionOverwrites: [
+            {
+              id: guild.roles.everyone.id,
+              allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory],
+              deny: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.AddReactions]
+            },
+            {
+              id: client.user.id,
+              allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks]
+            }
+          ]
+        });
+        console.log(`✅ Automatically created channel #${inviteChannel.name} (${inviteChannel.id})`);
+      } catch (createErr) {
+        console.error('Failed to auto-create invite rewards channel:', createErr.message);
+        return;
+      }
+    }
+
+    const messages = await inviteChannel.messages.fetch({ limit: 15 });
+    const botMsg = messages.find(m => m.author.id === client.user.id && m.embeds.length > 0 && m.embeds[0].title?.includes('INVITE & WIN REWARDS'));
+    if (botMsg) {
+      console.log('📌 Invite & Win Rewards panel already exists in #' + inviteChannel.name);
+      return;
+    }
+
+    const inviteEmbed = new EmbedBuilder()
+      .setColor(0xF59E0B)
+      .setTitle('🎁 NISHU STORE // INVITE & WIN REWARDS HUB')
+      .setDescription(
+        'Welcome to our **Official Community Invite & Win Program**! 🚀\n\n' +
+        'Invite your friends, colleagues, and community members to **NISHU STORE** and unlock exclusive premium rewards, VIP perks, and store prizes!\n\n' +
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+        '**🏆 EXCLUSIVE INVITE MILESTONE REWARDS:**\n' +
+        '• 🌐 **25 Invites:** ⚡ **Unlimited Data for a Month** 📶\n' +
+        '• 🎯 **30 Invites:** 🔥 **Free Fire VIP Panel** 🎮\n' +
+        '• 🚀 **100+ Invites:** 🔒 **COMING SOON (Super Mega Rewards!)** ✨\n\n' +
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+        '**📋 HOW TO PARTICIPATE:**\n' +
+        '1. Click **"🔗 Get My Invite Link"** below to get your unique link.\n' +
+        '2. Share your link with friends, groups, or social media!\n' +
+        '3. When someone joins, your stats increase automatically.\n' +
+        '4. Once you hit a milestone, click **"🎫 Claim Prize"** to open a ticket and claim your reward!\n\n' +
+        '⚠️ *Anti-Cheat Active: Fake accounts and accounts that leave are automatically deducted.*'
+      )
+      .setFooter({ text: 'NISHU STORE • Invite & Win Program' })
+      .setTimestamp();
+
+    const actionRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('btn_get_my_invite_link')
+        .setLabel('🔗 Get My Invite Link')
+        .setEmoji('🔗')
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId('btn_check_my_invites')
+        .setLabel('📊 My Stats')
+        .setEmoji('📊')
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId('btn_view_inviterank')
+        .setLabel('🏆 Top 10')
+        .setEmoji('🏆')
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setLabel('🎫 Claim Prize')
+        .setEmoji('🎁')
+        .setStyle(ButtonStyle.Link)
+        .setURL('https://discord.com/channels/' + guild.id + '/1566968095422287912')
+    );
+
+    await inviteChannel.send({ embeds: [inviteEmbed], components: [actionRow] });
+    console.log('✅ Posted Invite & Win Rewards Panel in #' + inviteChannel.name);
+  } catch (err) {
+    console.error('Error in setupInviteRewardsPanel:', err);
+  }
+}
+
 // --- 5. WELCOME EVENT (Clean Card in #welcome with direct link button) ---
 client.on('guildMemberAdd', async (member) => {
   try {
     const welcomeChannelId = process.env.WELCOME_CHANNEL_ID;
     const rulesChannelId = process.env.RULES_CHANNEL_ID;
     const rolesChannelId = process.env.ROLES_CHANNEL_ID || '1566958208512163961';
+    const autoRoleId = process.env.AUTO_ROLE_ID;
+
+    // 1. AUTO-ROLE ASSIGNMENT (Instant role on join)
+    if (autoRoleId) {
+      try {
+        await member.roles.add(autoRoleId);
+        console.log(`🛡️ Assigned Auto-Role (${autoRoleId}) to ${member.user.tag}`);
+      } catch (roleErr) {
+        console.warn(`⚠️ Could not assign auto-role to ${member.user.tag}:`, roleErr.message);
+      }
+    }
 
     if (!welcomeChannelId) return;
     const channel = member.guild.channels.cache.get(welcomeChannelId);
@@ -499,8 +616,20 @@ client.on('guildMemberAdd', async (member) => {
 
       await member.send({ embeds: [dmEmbed] });
     } catch (dmErr) {}
+
+    // Track which invite was used
+    await handleMemberInviteJoin(member);
   } catch (error) {
     console.error('❌ Error handling guildMemberAdd:', error);
+  }
+});
+
+// Member Leaves (Deduct from inviter's regular count / increase left count)
+client.on('guildMemberRemove', async (member) => {
+  try {
+    await handleMemberInviteLeave(member);
+  } catch (err) {
+    console.error('Error handling guildMemberRemove invite deduction:', err);
   }
 });
 
@@ -661,6 +790,53 @@ client.on('interactionCreate', async (interaction) => {
     // 8. Admin Broadcast (Mass DM) Command
     if (interaction.isChatInputCommand() && interaction.commandName === 'broadcast') {
       await handleBroadcastCommand(interaction);
+    }
+
+    // 8.5 Giveaway System Commands
+    if (interaction.isChatInputCommand() && interaction.commandName === 'giveaway') {
+      await handleGiveawayCommand(interaction);
+    }
+
+    // 8.6 Store Vouch / Review Command
+    if (interaction.isChatInputCommand() && interaction.commandName === 'vouch') {
+      await handleVouchCommand(interaction);
+    }
+
+    // 8.7 Auto-Mod Configuration Command
+    if (interaction.isChatInputCommand() && interaction.commandName === 'automod') {
+      await handleAutoModCommand(interaction);
+    }
+
+    // 8.8 Smart Auto-Pretty Announce Command
+    if (interaction.isChatInputCommand() && interaction.commandName === 'announce') {
+      await handleAnnounceCommand(interaction);
+    }
+
+    // 8.9 Invite Tracking Commands
+    if (interaction.isChatInputCommand() && interaction.commandName === 'invites') {
+      await handleInvitesCommand(interaction);
+    }
+
+    if (interaction.isChatInputCommand() && interaction.commandName === 'inviterank') {
+      await handleInviteRankCommand(interaction);
+    }
+
+    // Invite & Win Panel Interactive Buttons
+    if (interaction.isButton() && interaction.customId === 'btn_get_my_invite_link') {
+      await handleGetMyInviteLink(interaction);
+    }
+
+    if (interaction.isButton() && interaction.customId === 'btn_check_my_invites') {
+      await handleInvitesCommand(interaction);
+    }
+
+    if (interaction.isButton() && interaction.customId === 'btn_view_inviterank') {
+      await handleInviteRankCommand(interaction);
+    }
+
+    // Giveaway Entry Button
+    if (interaction.isButton() && interaction.customId.startsWith('giveaway_enter_')) {
+      await handleGiveawayButton(interaction);
     }
 
     // 9. Interactive Bot-Texts Dashboard Interactions
@@ -1015,7 +1191,204 @@ async function registerSlashCommands() {
           opt.setName('title')
             .setDescription('Optional announcement title for the DM embed')
             .setRequired(false)
+        ),
+      new SlashCommandBuilder()
+        .setName('giveaway')
+        .setDescription('🎉 Manage server giveaways')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+        .addSubcommand(sub =>
+          sub
+            .setName('start')
+            .setDescription('Start a new giveaway')
+            .addStringOption(opt =>
+              opt.setName('duration')
+                .setDescription('Duration of giveaway (e.g. 10m, 1h, 2d, 30s)')
+                .setRequired(true)
+            )
+            .addStringOption(opt =>
+              opt.setName('prize')
+                .setDescription('What prize are you giving away?')
+                .setRequired(true)
+            )
+            .addIntegerOption(opt =>
+              opt.setName('winners')
+                .setDescription('Number of winners (default: 1)')
+                .setRequired(false)
+                .setMinValue(1)
+                .setMaxValue(20)
+            )
+            .addChannelOption(opt =>
+              opt.setName('channel')
+                .setDescription('Channel to host giveaway in (default: current channel)')
+                .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+                .setRequired(false)
+            )
         )
+        .addSubcommand(sub =>
+          sub
+            .setName('end')
+            .setDescription('End an active giveaway early')
+            .addStringOption(opt =>
+              opt.setName('message_id')
+                .setDescription('Message ID of the giveaway')
+                .setRequired(true)
+            )
+        )
+        .addSubcommand(sub =>
+          sub
+            .setName('reroll')
+            .setDescription('Re-roll winner(s) for a finished giveaway')
+            .addStringOption(opt =>
+              opt.setName('message_id')
+                .setDescription('Message ID of the giveaway')
+                .setRequired(true)
+            )
+            .addIntegerOption(opt =>
+              opt.setName('winners')
+                .setDescription('Number of winners to reroll (default: 1)')
+                .setRequired(false)
+                .setMinValue(1)
+                .setMaxValue(10)
+            )
+        ),
+      new SlashCommandBuilder()
+        .setName('vouch')
+        .setDescription('⭐ Leave a review/feedback for Nishu Store')
+        .addIntegerOption(opt =>
+          opt.setName('rating')
+            .setDescription('Rating from 1 to 5 stars')
+            .setRequired(true)
+            .setMinValue(1)
+            .setMaxValue(5)
+        )
+        .addStringOption(opt =>
+          opt.setName('product')
+            .setDescription('Product or service purchased')
+            .setRequired(true)
+        )
+        .addStringOption(opt =>
+          opt.setName('comment')
+            .setDescription('Your detailed experience & review')
+            .setRequired(true)
+        )
+        .addAttachmentOption(opt =>
+          opt.setName('proof')
+            .setDescription('Screenshot of payment, delivery or vouch proof')
+            .setRequired(false)
+        ),
+      new SlashCommandBuilder()
+        .setName('automod')
+        .setDescription('🛡️ [OWNER/ADMIN] Configure Anti-Link, Anti-Spam & Auto-Mod rules')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        .addSubcommand(sub =>
+          sub
+            .setName('status')
+            .setDescription('View current Auto-Mod protection settings')
+        )
+        .addSubcommand(sub =>
+          sub
+            .setName('toggle')
+            .setDescription('Turn specific Auto-Mod protections ON or OFF')
+            .addStringOption(opt =>
+              opt.setName('feature')
+                .setDescription('Feature to toggle')
+                .setRequired(true)
+                .addChoices(
+                  { name: '🔗 Anti-Links (Block all web links)', value: 'antiLink' },
+                  { name: '📨 Anti-Discord Invites (Block discord.gg links)', value: 'antiDiscord' },
+                  { name: '⚡ Anti-Spam (Block rapid message spam)', value: 'antiSpam' }
+                )
+            )
+            .addBooleanOption(opt =>
+              opt.setName('enabled')
+                .setDescription('Enable (true) or Disable (false)')
+                .setRequired(true)
+            )
+        )
+        .addSubcommand(sub =>
+          sub
+            .setName('word')
+            .setDescription('Add or remove banned / blacklisted words')
+            .addStringOption(opt =>
+              opt.setName('action')
+                .setDescription('Add or remove word')
+                .setRequired(true)
+                .addChoices(
+                  { name: '➕ Add Word to Blacklist', value: 'add' },
+                  { name: '➖ Remove Word from Blacklist', value: 'remove' }
+                )
+            )
+            .addStringOption(opt =>
+              opt.setName('text')
+                .setDescription('The word or phrase to block/unblock')
+                .setRequired(true)
+            )
+        )
+        .addSubcommand(sub =>
+          sub
+            .setName('whitelist')
+            .setDescription('Whitelist or bypass a channel or role from Auto-Mod')
+            .addStringOption(opt =>
+              opt.setName('type')
+                .setDescription('Channel or Role')
+                .setRequired(true)
+                .addChoices(
+                  { name: 'Channel Whitelist', value: 'channel' },
+                  { name: 'Role Whitelist', value: 'role' }
+                )
+            )
+            .addChannelOption(opt =>
+              opt.setName('channel')
+                .setDescription('Channel to whitelist / bypass')
+                .setRequired(false)
+            )
+            .addRoleOption(opt =>
+              opt.setName('role')
+                .setDescription('Role to whitelist / bypass')
+                .setRequired(false)
+            )
+        ),
+      new SlashCommandBuilder()
+        .setName('announce')
+        .setDescription('✨ [ADMIN] Convert any message into an ultra-sleek, beautifully styled announcement')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        .addStringOption(opt =>
+          opt.setName('message')
+            .setDescription('Your raw announcement text (the bot will auto-format and style it!)')
+            .setRequired(true)
+        )
+        .addChannelOption(opt =>
+          opt.setName('channel')
+            .setDescription('Channel to post the announcement in (default: current channel)')
+            .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+            .setRequired(false)
+        )
+        .addStringOption(opt =>
+          opt.setName('title')
+            .setDescription('Optional custom title (leave empty for smart auto-title)')
+            .setRequired(false)
+        )
+        .addAttachmentOption(opt =>
+          opt.setName('image')
+            .setDescription('Optional banner/image attachment')
+            .setRequired(false)
+        )
+        .addBooleanOption(opt =>
+          opt.setName('ping_everyone')
+            .setDescription('Ping @everyone with the announcement? (default: false)')
+            .setRequired(false)
+        ),
+      new SlashCommandBuilder()
+        .setName('invites')
+        .setDescription('📊 Check how many members you or another user has invited to Nishu Store')
+        .addUserOption(opt =>
+          opt.setName('user')
+            .setDescription('User to check invites for (default: yourself)')
+            .setRequired(false)
+        ),
+      new SlashCommandBuilder()
+        .setName('inviterank')
+        .setDescription('🏆 View top 10 members with the most server invites')
     ];
 
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
@@ -2073,7 +2446,1071 @@ async function handleStoreButton(interaction) {
 }
 
 // ==========================================
-// --- 11. START BOT ---
+// --- 11. MODERN PERSISTENT GIVEAWAY SYSTEM ---
+// ==========================================
+const GIVEAWAYS_FILE = path.join(__dirname, 'giveaways.json');
+
+function loadGiveaways() {
+  try {
+    if (!fs.existsSync(GIVEAWAYS_FILE)) {
+      fs.writeFileSync(GIVEAWAYS_FILE, '[]', 'utf8');
+      return [];
+    }
+    const data = fs.readFileSync(GIVEAWAYS_FILE, 'utf8');
+    return JSON.parse(data) || [];
+  } catch (err) {
+    console.error('Error loading giveaways.json:', err);
+    return [];
+  }
+}
+
+function saveGiveaways(giveaways) {
+  try {
+    fs.writeFileSync(GIVEAWAYS_FILE, JSON.stringify(giveaways, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Error saving giveaways.json:', err);
+  }
+}
+
+function parseDurationString(str) {
+  if (!str) return null;
+  const match = str.trim().match(/^(\d+)\s*(s|m|h|d|w)$/i);
+  if (!match) return null;
+  const value = parseInt(match[1], 10);
+  const unit = match[2].toLowerCase();
+  switch (unit) {
+    case 's': return value * 1000;
+    case 'm': return value * 60 * 1000;
+    case 'h': return value * 60 * 60 * 1000;
+    case 'd': return value * 24 * 60 * 60 * 1000;
+    case 'w': return value * 7 * 24 * 60 * 60 * 1000;
+    default: return null;
+  }
+}
+
+let giveawayTimerInterval = null;
+
+function initGiveaways() {
+  console.log('🎉 Initializing Giveaway System...');
+  if (giveawayTimerInterval) clearInterval(giveawayTimerInterval);
+
+  giveawayTimerInterval = setInterval(async () => {
+    try {
+      const giveaways = loadGiveaways();
+      const now = Date.now();
+      for (const g of giveaways) {
+        if (!g.ended && g.endTime <= now) {
+          await endGiveaway(g.messageId);
+        }
+      }
+    } catch (e) {
+      console.error('Error in giveaway check interval:', e);
+    }
+  }, 10000);
+}
+
+function buildGiveawayEmbed(g, isEnded = false) {
+  const embed = new EmbedBuilder();
+  const endTimestamp = Math.floor(g.endTime / 1000);
+
+  if (isEnded) {
+    embed
+      .setColor(0xED4245)
+      .setTitle(`🎁 GIVEAWAY ENDED: ${g.prize}`)
+      .setDescription(
+        `**Prize:** 🏆 **${g.prize}**\n` +
+        `**Hosted by:** <@${g.hostedBy}>\n` +
+        `**Total Entries:** 🎟️ **${g.entries.length}**\n\n` +
+        (g.winners && g.winners.length > 0
+          ? `🏆 **Winner(s):** ${g.winners.map(id => `<@${id}>`).join(', ')}`
+          : '❌ **Winner(s):** No valid entries found!')
+      )
+      .setFooter({ text: 'Giveaway Ended' })
+      .setTimestamp(new Date(g.endTime));
+  } else {
+    embed
+      .setColor(0x5865F2)
+      .setTitle(`🎉 GIVEAWAY: ${g.prize}`)
+      .setDescription(
+        `React below with the button to enter!\n\n` +
+        `🏆 **Prize:** **${g.prize}**\n` +
+        `👑 **Hosted by:** <@${g.hostedBy}>\n` +
+        `👥 **Winners:** **${g.winnersCount}**\n` +
+        `⏳ **Ends:** <t:${endTimestamp}:R> (<t:${endTimestamp}:F>)\n` +
+        `🎟️ **Current Entries:** **${g.entries.length}**`
+      )
+      .setFooter({ text: `${g.winnersCount} Winner${g.winnersCount > 1 ? 's' : ''} • Good luck!` })
+      .setTimestamp(new Date(g.endTime));
+  }
+
+  return embed;
+}
+
+function buildGiveawayButton(g, isEnded = false) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`giveaway_enter_${g.messageId}`)
+      .setLabel(isEnded ? `Ended (${g.entries.length})` : `🎉 Enter Giveaway (${g.entries.length})`)
+      .setStyle(isEnded ? ButtonStyle.Secondary : ButtonStyle.Primary)
+      .setDisabled(isEnded)
+  );
+}
+
+async function handleGiveawayCommand(interaction) {
+  const subcommand = interaction.options.getSubcommand();
+
+  if (subcommand === 'start') {
+    const durationInput = interaction.options.getString('duration');
+    const prize = interaction.options.getString('prize');
+    const winnersCount = interaction.options.getInteger('winners') || 1;
+    const targetChannel = interaction.options.getChannel('channel') || interaction.channel;
+
+    const durationMs = parseDurationString(durationInput);
+    if (!durationMs || durationMs < 5000) {
+      return interaction.reply({
+        content: '❌ Invalid duration! Please provide a valid duration like `30s`, `10m`, `2h`, `1d`.',
+        flags: 64
+      });
+    }
+
+    await interaction.deferReply({ flags: 64 });
+
+    const endTime = Date.now() + durationMs;
+    const initialGiveawayData = {
+      messageId: '',
+      channelId: targetChannel.id,
+      guildId: interaction.guildId,
+      prize,
+      winnersCount,
+      hostedBy: interaction.user.id,
+      endTime,
+      entries: [],
+      ended: false,
+      winners: []
+    };
+
+    const tempEmbed = buildGiveawayEmbed(initialGiveawayData, false);
+    const tempRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('giveaway_enter_temp')
+        .setLabel('🎉 Enter Giveaway (0)')
+        .setStyle(ButtonStyle.Primary)
+    );
+
+    const giveawayMsg = await targetChannel.send({
+      content: '🎉 **NEW GIVEAWAY!** 🎉',
+      embeds: [tempEmbed],
+      components: [tempRow]
+    });
+
+    initialGiveawayData.messageId = giveawayMsg.id;
+
+    // Update message with actual ID in customId
+    await giveawayMsg.edit({
+      components: [buildGiveawayButton(initialGiveawayData, false)]
+    });
+
+    const giveaways = loadGiveaways();
+    giveaways.push(initialGiveawayData);
+    saveGiveaways(giveaways);
+
+    return interaction.editReply({
+      content: `✅ Giveaway started in ${targetChannel}! Message ID: \`${giveawayMsg.id}\``
+    });
+  }
+
+  if (subcommand === 'end') {
+    const messageId = interaction.options.getString('message_id').trim();
+    await interaction.deferReply({ flags: 64 });
+
+    const giveaways = loadGiveaways();
+    const g = giveaways.find(item => item.messageId === messageId);
+    if (!g) {
+      return interaction.editReply({ content: `❌ Giveaway with Message ID \`${messageId}\` not found in database!` });
+    }
+    if (g.ended) {
+      return interaction.editReply({ content: '⚠️ This giveaway has already ended!' });
+    }
+
+    await endGiveaway(messageId);
+    return interaction.editReply({ content: `✅ Giveaway \`${messageId}\` ended immediately!` });
+  }
+
+  if (subcommand === 'reroll') {
+    const messageId = interaction.options.getString('message_id').trim();
+    const count = interaction.options.getInteger('winners') || 1;
+    await interaction.deferReply({ flags: 64 });
+
+    const giveaways = loadGiveaways();
+    const g = giveaways.find(item => item.messageId === messageId);
+    if (!g) {
+      return interaction.editReply({ content: `❌ Giveaway with Message ID \`${messageId}\` not found!` });
+    }
+    if (!g.ended) {
+      return interaction.editReply({ content: '⚠️ This giveaway is still running. Use `/giveaway end` to conclude it first.' });
+    }
+
+    if (!g.entries || g.entries.length === 0) {
+      return interaction.editReply({ content: '❌ No users entered this giveaway, cannot reroll!' });
+    }
+
+    const availableEntries = g.entries.filter(id => !g.winners?.includes(id));
+    const pool = availableEntries.length > 0 ? availableEntries : g.entries;
+
+    const newWinners = [];
+    const poolCopy = [...pool];
+    const winnersToPick = Math.min(count, poolCopy.length);
+
+    for (let i = 0; i < winnersToPick; i++) {
+      const idx = Math.floor(Math.random() * poolCopy.length);
+      newWinners.push(poolCopy[idx]);
+      poolCopy.splice(idx, 1);
+    }
+
+    try {
+      const channel = await client.channels.fetch(g.channelId);
+      if (channel) {
+        await channel.send({
+          content: `🎉 **GIVEAWAY REROLL** 🎉\nCongratulations to new winner(s): ${newWinners.map(id => `<@${id}>`).join(', ')}! You won: **${g.prize}**!`
+        });
+      }
+    } catch (e) {
+      console.error('Error posting reroll announcement:', e);
+    }
+
+    return interaction.editReply({
+      content: `🎉 Rerolled! New Winner(s): ${newWinners.map(id => `<@${id}>`).join(', ')}`
+    });
+  }
+}
+
+async function handleGiveawayButton(interaction) {
+  const messageId = interaction.customId.replace('giveaway_enter_', '');
+  const giveaways = loadGiveaways();
+  const g = giveaways.find(item => item.messageId === messageId);
+
+  if (!g) {
+    return interaction.reply({ content: '❌ This giveaway is no longer active or recorded.', flags: 64 });
+  }
+
+  if (g.ended || g.endTime <= Date.now()) {
+    return interaction.reply({ content: '⚠️ This giveaway has already closed!', flags: 64 });
+  }
+
+  const userId = interaction.user.id;
+  const index = g.entries.indexOf(userId);
+
+  if (index > -1) {
+    // Leave giveaway
+    g.entries.splice(index, 1);
+    saveGiveaways(giveaways);
+
+    try {
+      await interaction.message.edit({
+        embeds: [buildGiveawayEmbed(g, false)],
+        components: [buildGiveawayButton(g, false)]
+      });
+    } catch (e) {}
+
+    return interaction.reply({
+      content: '🚪 You left the giveaway. You can re-enter anytime before it ends!',
+      flags: 64
+    });
+  } else {
+    // Enter giveaway
+    g.entries.push(userId);
+    saveGiveaways(giveaways);
+
+    try {
+      await interaction.message.edit({
+        embeds: [buildGiveawayEmbed(g, false)],
+        components: [buildGiveawayButton(g, false)]
+      });
+    } catch (e) {}
+
+    return interaction.reply({
+      content: `🎉 You successfully entered the giveaway for **${g.prize}**! Good luck! 🍀`,
+      flags: 64
+    });
+  }
+}
+
+async function endGiveaway(messageId) {
+  const giveaways = loadGiveaways();
+  const g = giveaways.find(item => item.messageId === messageId);
+  if (!g || g.ended) return;
+
+  g.ended = true;
+
+  // Pick random winner(s)
+  const winners = [];
+  if (g.entries && g.entries.length > 0) {
+    const pool = [...g.entries];
+    const winnersCount = Math.min(g.winnersCount || 1, pool.length);
+    for (let i = 0; i < winnersCount; i++) {
+      const idx = Math.floor(Math.random() * pool.length);
+      winners.push(pool[idx]);
+      pool.splice(idx, 1);
+    }
+  }
+
+  g.winners = winners;
+  saveGiveaways(giveaways);
+
+  try {
+    const channel = await client.channels.fetch(g.channelId);
+    if (!channel) return;
+
+    const message = await channel.messages.fetch(g.messageId).catch(() => null);
+    if (message) {
+      await message.edit({
+        embeds: [buildGiveawayEmbed(g, true)],
+        components: [buildGiveawayButton(g, true)]
+      });
+    }
+
+    if (winners.length > 0) {
+      const winnerPings = winners.map(id => `<@${id}>`).join(' ');
+      await channel.send({
+        content: `🎉 Congratulations ${winnerPings}! You won **${g.prize}**! 🏆`,
+        reply: message ? { messageReference: message.id } : undefined
+      });
+
+      // Try sending DMs to winners
+      for (const wId of winners) {
+        try {
+          const u = await client.users.fetch(wId);
+          if (u) {
+            const winDmEmbed = new EmbedBuilder()
+              .setColor(0xF59E0B)
+              .setTitle('🎉 CONGRATULATIONS! YOU WON A GIVEAWAY! 🏆')
+              .setDescription(
+                `Hey ${u.username}!\n\n` +
+                `You were chosen as a winner for: **${g.prize}** in **NISHU STORE**!\n\n` +
+                `📩 Please open a support ticket or check with <@${g.hostedBy}> to claim your prize!`
+              )
+              .setTimestamp();
+            await u.send({ embeds: [winDmEmbed] }).catch(() => {});
+          }
+        } catch (dmErr) {}
+      }
+    } else {
+      await channel.send({
+        content: `⚠️ Giveaway for **${g.prize}** ended, but no eligible entries were recorded!`,
+        reply: message ? { messageReference: message.id } : undefined
+      });
+    }
+  } catch (err) {
+    console.error(`Error ending giveaway ${messageId}:`, err);
+  }
+}
+
+// ==========================================
+// --- 12. STORE VOUCH & REVIEWS SYSTEM ---
+// ==========================================
+const VOUCHES_FILE = path.join(__dirname, 'vouches.json');
+const VOUCH_CHANNEL_ID = process.env.VOUCH_CHANNEL_ID || '1566975747879477299'; // Defaults to logs or reviews channel
+
+function loadVouches() {
+  try {
+    if (!fs.existsSync(VOUCHES_FILE)) {
+      fs.writeFileSync(VOUCHES_FILE, '[]', 'utf8');
+      return [];
+    }
+    const data = fs.readFileSync(VOUCHES_FILE, 'utf8');
+    return JSON.parse(data) || [];
+  } catch (err) {
+    console.error('Error loading vouches.json:', err);
+    return [];
+  }
+}
+
+function saveVouches(vouches) {
+  try {
+    fs.writeFileSync(VOUCHES_FILE, JSON.stringify(vouches, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Error saving vouches.json:', err);
+  }
+}
+
+async function handleVouchCommand(interaction) {
+  await interaction.deferReply({ flags: 64 });
+
+  const rating = interaction.options.getInteger('rating');
+  const product = interaction.options.getString('product');
+  const comment = interaction.options.getString('comment');
+  const proofAttachment = interaction.options.getAttachment('proof');
+
+  const starsString = '⭐'.repeat(rating) + '☆'.repeat(5 - rating);
+
+  const vouches = loadVouches();
+  const newVouch = {
+    id: Date.now().toString(),
+    userId: interaction.user.id,
+    userTag: interaction.user.tag,
+    rating,
+    product,
+    comment,
+    proofUrl: proofAttachment ? proofAttachment.url : null,
+    timestamp: Date.now()
+  };
+
+  vouches.push(newVouch);
+  saveVouches(vouches);
+
+  // Calculate Average Rating
+  const totalRatings = vouches.reduce((acc, v) => acc + (v.rating || 5), 0);
+  const averageRating = (totalRatings / vouches.length).toFixed(1);
+
+  // Target vouch channel
+  let targetChannel = null;
+  if (process.env.VOUCH_CHANNEL_ID) {
+    targetChannel = interaction.guild.channels.cache.get(process.env.VOUCH_CHANNEL_ID);
+  }
+  if (!targetChannel) {
+    // Search for a channel named #vouches, #reviews, or fallback to current channel
+    targetChannel = interaction.guild.channels.cache.find(c => 
+      c.name.includes('vouch') || c.name.includes('review')
+    ) || interaction.channel;
+  }
+
+  const vouchEmbed = new EmbedBuilder()
+    .setColor(rating >= 4 ? 0x10B981 : (rating === 3 ? 0xF59E0B : 0xEF4444))
+    .setTitle('🌟 NEW CUSTOMER REVIEW // VOUCH')
+    .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
+    .addFields(
+      { name: '👤 Customer', value: `${interaction.user} (\`${interaction.user.tag}\`)`, inline: true },
+      { name: '📦 Product / Service', value: `\`${product}\``, inline: true },
+      { name: '⭐ Rating', value: `${starsString} (**${rating}/5**)`, inline: true },
+      { name: '💬 Review', value: comment, inline: false },
+      { name: '📊 Overall Store Rating', value: `⭐ **${averageRating} / 5.0** (${vouches.length} Total Reviews)`, inline: false }
+    )
+    .setFooter({ text: 'NISHU STORE • Verified Customer Review' })
+    .setTimestamp();
+
+  if (proofAttachment && proofAttachment.contentType && proofAttachment.contentType.startsWith('image/')) {
+    vouchEmbed.setImage(proofAttachment.url);
+  }
+
+  try {
+    const postedMsg = await targetChannel.send({ embeds: [vouchEmbed] });
+    await postedMsg.react('❤️').catch(() => {});
+    await postedMsg.react('⭐').catch(() => {});
+  } catch (err) {
+    console.error('Error posting vouch to channel:', err);
+  }
+
+  return interaction.editReply({
+    content: `✅ **Thank you for your review!** Your vouch has been recorded and posted in ${targetChannel}. Overall rating: **${averageRating} / 5.0** ⭐`
+  });
+}
+
+// ==========================================
+// --- 13. AUTO-MOD & ANTI-LINK/SPAM PROTECTION ---
+// ==========================================
+const AUTOMOD_FILE = path.join(__dirname, 'automod.json');
+
+const DEFAULT_AUTOMOD_CONFIG = {
+  antiLink: true,
+  antiDiscord: true,
+  antiSpam: true,
+  whitelistedRoles: [],
+  whitelistedChannels: [],
+  blacklistedWords: []
+};
+
+function loadAutoModConfig() {
+  try {
+    if (!fs.existsSync(AUTOMOD_FILE)) {
+      fs.writeFileSync(AUTOMOD_FILE, JSON.stringify(DEFAULT_AUTOMOD_CONFIG, null, 2), 'utf8');
+      return { ...DEFAULT_AUTOMOD_CONFIG };
+    }
+    const data = fs.readFileSync(AUTOMOD_FILE, 'utf8');
+    return { ...DEFAULT_AUTOMOD_CONFIG, ...JSON.parse(data) };
+  } catch (err) {
+    console.error('Error loading automod.json:', err);
+    return { ...DEFAULT_AUTOMOD_CONFIG };
+  }
+}
+
+function saveAutoModConfig(config) {
+  try {
+    fs.writeFileSync(AUTOMOD_FILE, JSON.stringify(config, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Error saving automod.json:', err);
+  }
+}
+
+// In-memory spam tracker: userId -> timestamp[]
+const userMessageHistory = new Map();
+
+async function handleAutoModCommand(interaction) {
+  // Only server Administrators / Server Owner / Staff can configure Auto-Mod
+  if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator) && interaction.user.id !== interaction.guild.ownerId) {
+    return interaction.reply({
+      content: '❌ **Access Denied:** Only the Server Owner or Administrators can configure Auto-Mod rules!',
+      flags: 64
+    });
+  }
+
+  const subcommand = interaction.options.getSubcommand();
+  const config = loadAutoModConfig();
+
+  if (subcommand === 'status') {
+    const statusEmbed = new EmbedBuilder()
+      .setColor(0x5865F2)
+      .setTitle('🛡️ NISHU STORE // AUTO-MOD SECURITY DASHBOARD')
+      .setDescription(
+        'Here are the current protection settings applied across the server:\n\n' +
+        `• 🔗 **Anti-Link Protection:** ${config.antiLink ? '✅ `ENABLED` (Blocks external web links)' : '❌ `DISABLED`'}\n` +
+        `• 📨 **Anti-Discord Invites:** ${config.antiDiscord ? '✅ `ENABLED` (Blocks server invite links)' : '❌ `DISABLED`'}\n` +
+        `• ⚡ **Anti-Spam Filter:** ${config.antiSpam ? '✅ `ENABLED` (Blocks > 5 msgs in 4s)' : '❌ `DISABLED`'}\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `🚫 **Blacklisted Words (${config.blacklistedWords.length}):**\n` +
+        (config.blacklistedWords.length > 0 ? config.blacklistedWords.map(w => `\`${w}\``).join(', ') : '*No banned words set yet.*') + '\n\n' +
+        `🛡️ **Whitelisted Roles:**\n` +
+        (config.whitelistedRoles.length > 0 ? config.whitelistedRoles.map(r => `<@&${r}>`).join(', ') : '*None (Staff roles always bypassed)*') + '\n\n' +
+        `📢 **Whitelisted Channels:**\n` +
+        (config.whitelistedChannels.length > 0 ? config.whitelistedChannels.map(c => `<#${c}>`).join(', ') : '*None (Protected everywhere)*')
+      )
+      .setFooter({ text: 'Configured by Owner/Staff • Live Defense System' })
+      .setTimestamp();
+
+    return interaction.reply({ embeds: [statusEmbed], flags: 64 });
+  }
+
+  if (subcommand === 'toggle') {
+    const feature = interaction.options.getString('feature');
+    const enabled = interaction.options.getBoolean('enabled');
+
+    config[feature] = enabled;
+    saveAutoModConfig(config);
+
+    const featureNames = {
+      antiLink: 'Anti-Link Protection (External Links)',
+      antiDiscord: 'Anti-Discord Invites (discord.gg)',
+      antiSpam: 'Anti-Spam Defense'
+    };
+
+    return interaction.reply({
+      content: `✅ **Auto-Mod Updated:** \`${featureNames[feature]}\` is now **${enabled ? 'ENABLED 🟢' : 'DISABLED 🔴'}**!`,
+      flags: 64
+    });
+  }
+
+  if (subcommand === 'word') {
+    const action = interaction.options.getString('action');
+    const wordText = interaction.options.getString('text').trim().toLowerCase();
+
+    if (action === 'add') {
+      if (!config.blacklistedWords.includes(wordText)) {
+        config.blacklistedWords.push(wordText);
+        saveAutoModConfig(config);
+        return interaction.reply({
+          content: `✅ Added word/phrase \`${wordText}\` to the Auto-Mod blacklist! Any message containing this will be deleted instantly.`,
+          flags: 64
+        });
+      } else {
+        return interaction.reply({ content: `⚠️ \`${wordText}\` is already in the blacklist!`, flags: 64 });
+      }
+    } else if (action === 'remove') {
+      const idx = config.blacklistedWords.indexOf(wordText);
+      if (idx > -1) {
+        config.blacklistedWords.splice(idx, 1);
+        saveAutoModConfig(config);
+        return interaction.reply({ content: `✅ Removed \`${wordText}\` from the Auto-Mod blacklist!`, flags: 64 });
+      } else {
+        return interaction.reply({ content: `❌ Word \`${wordText}\` was not found in the blacklist!`, flags: 64 });
+      }
+    }
+  }
+
+  if (subcommand === 'whitelist') {
+    const type = interaction.options.getString('type');
+
+    if (type === 'channel') {
+      const targetChannel = interaction.options.getChannel('channel') || interaction.channel;
+      const idx = config.whitelistedChannels.indexOf(targetChannel.id);
+      if (idx > -1) {
+        config.whitelistedChannels.splice(idx, 1);
+        saveAutoModConfig(config);
+        return interaction.reply({
+          content: `🔒 Removed ${targetChannel} from whitelist. Auto-Mod is now **active** in this channel!`,
+          flags: 64
+        });
+      } else {
+        config.whitelistedChannels.push(targetChannel.id);
+        saveAutoModConfig(config);
+        return interaction.reply({
+          content: `🔓 Whitelisted ${targetChannel}! Auto-Mod rules will now **ignore** messages posted here.`,
+          flags: 64
+        });
+      }
+    }
+
+    if (type === 'role') {
+      const role = interaction.options.getRole('role');
+      if (!role) {
+        return interaction.reply({ content: '❌ Please select a role to whitelist!', flags: 64 });
+      }
+
+      const idx = config.whitelistedRoles.indexOf(role.id);
+      if (idx > -1) {
+        config.whitelistedRoles.splice(idx, 1);
+        saveAutoModConfig(config);
+        return interaction.reply({ content: `🔒 Removed ${role} from whitelist.`, flags: 64 });
+      } else {
+        config.whitelistedRoles.push(role.id);
+        saveAutoModConfig(config);
+        return interaction.reply({ content: `🔓 Whitelisted ${role}! Members with this role can bypass Auto-Mod filters.`, flags: 64 });
+      }
+    }
+  }
+}
+
+// --- MESSAGE LISTENER FOR AUTO-MOD ---
+client.on('messageCreate', async (message) => {
+  try {
+    // Ignore bots and direct messages
+    if (!message.guild || message.author.bot) return;
+
+    // Check if user is Server Owner or Admin (Always bypassed)
+    if (message.author.id === message.guild.ownerId || message.member?.permissions.has(PermissionFlagsBits.Administrator)) {
+      return;
+    }
+
+    const config = loadAutoModConfig();
+
+    // Check channel whitelist
+    if (config.whitelistedChannels.includes(message.channel.id)) return;
+
+    // Check role whitelist
+    if (message.member && config.whitelistedRoles.some(rId => message.member.roles.cache.has(rId))) {
+      return;
+    }
+
+    const content = message.content || '';
+    let violationReason = null;
+
+    // 1. Check Anti-Discord Invite Links
+    if (config.antiDiscord) {
+      const discordInviteRegex = /(discord\.(gg|io|me|li)\/.+|discordapp\.com\/invite\/.+|discord\.com\/invite\/.+)/i;
+      if (discordInviteRegex.test(content)) {
+        violationReason = 'Discord Server Invite Links are strictly not allowed!';
+      }
+    }
+
+    // 2. Check Anti-Links (General web URLs)
+    if (!violationReason && config.antiLink) {
+      const linkRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/i;
+      if (linkRegex.test(content)) {
+        violationReason = 'Posting unauthorized external web links is prohibited!';
+      }
+    }
+
+    // 3. Check Blacklisted Words
+    if (!violationReason && config.blacklistedWords.length > 0) {
+      const lower = content.toLowerCase();
+      for (const badWord of config.blacklistedWords) {
+        if (lower.includes(badWord)) {
+          violationReason = `Your message contained a banned word/phrase.`;
+          break;
+        }
+      }
+    }
+
+    // 4. Check Anti-Spam (More than 5 messages within 4 seconds)
+    if (!violationReason && config.antiSpam) {
+      const now = Date.now();
+      const userId = message.author.id;
+      const history = userMessageHistory.get(userId) || [];
+
+      // Filter timestamps within last 4000ms
+      const recent = history.filter(t => now - t < 4000);
+      recent.push(now);
+      userMessageHistory.set(userId, recent);
+
+      if (recent.length >= 5) {
+        violationReason = 'Please slow down! Rapid message spamming is not allowed.';
+      }
+    }
+
+    // If violation found, delete message & warn
+    if (violationReason) {
+      await message.delete().catch(() => {});
+
+      const warnEmbed = new EmbedBuilder()
+        .setColor(0xED4245)
+        .setTitle('🛡️ NISHU STORE // AUTO-MOD WARNING')
+        .setDescription(`⚠️ ${message.author}, your message was removed!\n\n**Reason:** ${violationReason}`)
+        .setFooter({ text: 'Auto-Mod Security System' });
+
+      const warnMsg = await message.channel.send({ embeds: [warnEmbed] }).catch(() => null);
+      if (warnMsg) {
+        setTimeout(() => warnMsg.delete().catch(() => {}), 6000);
+      }
+    }
+  } catch (err) {
+    console.error('Error in Auto-Mod message listener:', err);
+  }
+});
+
+// ==========================================
+// --- 14. SMART AUTO-PRETTY ANNOUNCEMENT ENGINE ---
+// ==========================================
+
+function formatSmartAnnouncement(rawText, customTitle) {
+  const text = rawText.trim();
+  const lower = text.toLowerCase();
+
+  // 1. Smart Title Detection
+  let title = customTitle;
+  if (!title) {
+    if (lower.includes('sale') || lower.includes('discount') || lower.includes('offer') || lower.includes('deal') || lower.includes('% off')) {
+      title = '🔥 SPECIAL STORE OFFER // LIMITED SALE';
+    } else if (lower.includes('giveaway') || lower.includes('gift') || lower.includes('win') || lower.includes('nitro')) {
+      title = '🎉 EXCLUSIVE COMMUNITY GIVEAWAY & REWARDS';
+    } else if (lower.includes('rule') || lower.includes('warning') || lower.includes('scam') || lower.includes('notice')) {
+      title = '⚠️ IMPORTANT SERVER NOTICE & SECURITY BULLETIN';
+    } else if (lower.includes('update') || lower.includes('new') || lower.includes('feature')) {
+      title = '🚀 NEW STORE UPDATE & FEATURE RELEASE';
+    } else if (lower.includes('maintenance') || lower.includes('down') || lower.includes('offline')) {
+      title = '🔧 SCHEDULED MAINTENANCE & SYSTEM NOTICE';
+    } else {
+      title = '📢 NISHU STORE OFFICIAL ANNOUNCEMENT';
+    }
+  }
+
+  // 2. Smart Theme Color
+  let color = 0x5865F2; // Default Blurple
+  if (lower.includes('sale') || lower.includes('discount') || lower.includes('deal') || lower.includes('% off')) {
+    color = 0x10B981; // Green for discounts/money
+  } else if (lower.includes('giveaway') || lower.includes('win') || lower.includes('gift')) {
+    color = 0xF59E0B; // Gold / Yellow
+  } else if (lower.includes('warning') || lower.includes('rule') || lower.includes('ban') || lower.includes('scam')) {
+    color = 0xED4245; // Red
+  } else if (lower.includes('update') || lower.includes('release')) {
+    color = 0x9333EA; // Purple
+  }
+
+  // 3. Beautify Text Body
+  // Convert newlines and sentences into structured clean points
+  const rawLines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const formattedSections = [];
+
+  for (const line of rawLines) {
+    // If line starts with a list marker or bullet, preserve
+    if (/^[-*•\d+.]/i.test(line)) {
+      formattedSections.push(`🔹 ${line.replace(/^[-*•]\s*/, '')}`);
+    } else if (line.length > 80 && line.includes('.')) {
+      // Split into sentences for cleaner reading
+      const sentences = line.split(/(?<=[.!?])\s+/);
+      formattedSections.push(sentences.join('\n\n'));
+    } else {
+      formattedSections.push(line);
+    }
+  }
+
+  let formattedBody = formattedSections.join('\n\n');
+
+  // Highlight key keywords for premium look
+  formattedBody = formattedBody
+    .replace(/\b(sale|discount|deal|cheap|free|best price)\b/gi, '**$&**')
+    .replace(/\b(netflix|nitro|spotify|canva|prime|youtube|apple|discord)\b/gi, '**$&**')
+    .replace(/\b(ticket|open a ticket|support|dm)\b/gi, '🎫 **$&**')
+    .replace(/\b(instant delivery|24\/7|fast delivery)\b/gi, '⚡ **$&**');
+
+  const fullDescription = [
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    formattedBody,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `✨ *Brought to you by **NISHU STORE** • Always Premium & Secure*`
+  ].join('\n\n');
+
+  const embed = new EmbedBuilder()
+    .setColor(color)
+    .setTitle(title)
+    .setDescription(fullDescription)
+    .setFooter({ text: 'NISHU STORE • Verified Announcement', iconURL: 'https://cdn.discordapp.com/emojis/1041000844788371536.webp' })
+    .setTimestamp();
+
+  return embed;
+}
+
+async function handleAnnounceCommand(interaction) {
+  await interaction.deferReply({ flags: 64 });
+
+  const rawMessage = interaction.options.getString('message');
+  const targetChannel = interaction.options.getChannel('channel') || interaction.channel;
+  const customTitle = interaction.options.getString('title');
+  const imageAttachment = interaction.options.getAttachment('image');
+  const pingEveryone = interaction.options.getBoolean('ping_everyone') || false;
+
+  const embed = formatSmartAnnouncement(rawMessage, customTitle);
+
+  if (imageAttachment && imageAttachment.contentType && imageAttachment.contentType.startsWith('image/')) {
+    embed.setImage(imageAttachment.url);
+  }
+
+  try {
+    const postPayload = {
+      embeds: [embed]
+    };
+    if (pingEveryone) {
+      postPayload.content = '@everyone';
+    }
+
+    const sentMessage = await targetChannel.send(postPayload);
+    await sentMessage.react('🔥').catch(() => {});
+    await sentMessage.react('❤️').catch(() => {});
+
+    return interaction.editReply({
+      content: `✅ **Announcement beautified & posted successfully in ${targetChannel}!** [View Announcement](${sentMessage.url})`
+    });
+  } catch (err) {
+    console.error('Error posting beautified announcement:', err);
+    return interaction.editReply({ content: '❌ Failed to post announcement: ' + err.message });
+  }
+}
+
+// ==========================================
+// --- 15. INVITE TRACKING & LEADERBOARD SYSTEM ---
+// ==========================================
+const INVITES_FILE = path.join(__dirname, 'invites.json');
+
+// Memory cache of server invites: guildId -> Collection(inviteCode -> uses)
+const guildInvitesCache = new Map();
+
+// Map of memberId -> inviterId (to track who leaves)
+const memberJoinedWithInviter = new Map();
+
+function loadInvitesData() {
+  try {
+    if (!fs.existsSync(INVITES_FILE)) {
+      fs.writeFileSync(INVITES_FILE, '{}', 'utf8');
+      return {};
+    }
+    const data = fs.readFileSync(INVITES_FILE, 'utf8');
+    return JSON.parse(data) || {};
+  } catch (err) {
+    console.error('Error loading invites.json:', err);
+    return {};
+  }
+}
+
+function saveInvitesData(data) {
+  try {
+    fs.writeFileSync(INVITES_FILE, JSON.stringify(data, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Error saving invites.json:', err);
+  }
+}
+
+async function loadServerInvites() {
+  try {
+    console.log('🔗 Caching Server Invites...');
+    for (const guild of client.guilds.cache.values()) {
+      try {
+        const firstInvites = await guild.invites.fetch();
+        guildInvitesCache.set(guild.id, new Map(firstInvites.map(inv => [inv.code, inv.uses])));
+      } catch (e) {
+        console.warn(`Could not cache invites for guild ${guild.name}: ${e.message}`);
+      }
+    }
+    console.log('✅ Server Invites cached successfully!');
+  } catch (err) {
+    console.error('Error loading server invites:', err);
+  }
+}
+
+async function handleMemberInviteJoin(member) {
+  try {
+    const cachedInvites = guildInvitesCache.get(member.guild.id);
+    const newInvites = await member.guild.invites.fetch();
+    guildInvitesCache.set(member.guild.id, new Map(newInvites.map(inv => [inv.code, inv.uses])));
+
+    if (!cachedInvites) return;
+
+    // Find the invite whose use count increased
+    const usedInvite = newInvites.find(inv => {
+      const prevUses = cachedInvites.get(inv.code) || 0;
+      return inv.uses > prevUses;
+    });
+
+    if (usedInvite && usedInvite.inviter) {
+      const inviter = usedInvite.inviter;
+      memberJoinedWithInviter.set(member.id, inviter.id);
+
+      const allData = loadInvitesData();
+      if (!allData[inviter.id]) {
+        allData[inviter.id] = { regular: 0, left: 0, fake: 0, total: 0 };
+      }
+
+      // Check if self-invite or fake
+      if (inviter.id === member.id) {
+        allData[inviter.id].fake = (allData[inviter.id].fake || 0) + 1;
+      } else {
+        allData[inviter.id].regular = (allData[inviter.id].regular || 0) + 1;
+      }
+      allData[inviter.id].total = (allData[inviter.id].regular || 0) - (allData[inviter.id].left || 0);
+
+      saveInvitesData(allData);
+      console.log(`📈 ${member.user.tag} joined using invite from ${inviter.tag} (Total: ${allData[inviter.id].total})`);
+    }
+  } catch (err) {
+    console.error('Error handling member invite join:', err);
+  }
+}
+
+async function handleMemberInviteLeave(member) {
+  try {
+    const inviterId = memberJoinedWithInviter.get(member.id);
+    if (!inviterId) return;
+
+    const allData = loadInvitesData();
+    if (allData[inviterId]) {
+      allData[inviterId].left = (allData[inviterId].left || 0) + 1;
+      allData[inviterId].total = Math.max(0, (allData[inviterId].regular || 0) - (allData[inviterId].left || 0));
+      saveInvitesData(allData);
+      console.log(`📉 Member left. Deducted invite from inviter ID ${inviterId} (Remaining: ${allData[inviterId].total})`);
+    }
+    memberJoinedWithInviter.delete(member.id);
+  } catch (err) {
+    console.error('Error handling member invite leave:', err);
+  }
+}
+
+async function handleInvitesCommand(interaction) {
+  await interaction.deferReply();
+  const targetUser = interaction.options.getUser('user') || interaction.user;
+  const allData = loadInvitesData();
+  const userData = allData[targetUser.id] || { regular: 0, left: 0, fake: 0, total: 0 };
+
+  const regular = userData.regular || 0;
+  const left = userData.left || 0;
+  const fake = userData.fake || 0;
+  const net = Math.max(0, regular - left);
+
+  const embed = new EmbedBuilder()
+    .setColor(0x5865F2)
+    .setTitle(`🔗 INVITE STATS // ${targetUser.username.toUpperCase()}`)
+    .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
+    .setDescription(
+      `Here is the verified server invite statistics for **${targetUser}**:\n\n` +
+      `✨ **Net Real Invites:** **${net}**\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `📥 **Joins (Regular):** \`${regular}\` members\n` +
+      `🚪 **Leaves (Left):** \`${left}\` members\n` +
+      `⚠️ **Fake / Self:** \`${fake}\` members\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
+    )
+    .setFooter({ text: 'NISHU STORE • Official Invite Tracker' })
+    .setTimestamp();
+
+  return interaction.editReply({ embeds: [embed] });
+}
+
+async function handleInviteRankCommand(interaction) {
+  await interaction.deferReply();
+  const allData = loadInvitesData();
+
+  const sorted = Object.entries(allData)
+    .map(([userId, data]) => ({
+      userId,
+      regular: data.regular || 0,
+      left: data.left || 0,
+      fake: data.fake || 0,
+      net: Math.max(0, (data.regular || 0) - (data.left || 0))
+    }))
+    .filter(item => item.net > 0)
+    .sort((a, b) => b.net - a.net)
+    .slice(0, 10);
+
+  if (sorted.length === 0) {
+    return interaction.editReply({
+      content: '📊 **No invite records found yet!** Start sharing your server invite link to get on the leaderboard!'
+    });
+  }
+
+  const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+  const leaderboardLines = sorted.map((entry, index) => {
+    const medal = medals[index] || `\`#${index + 1}\``;
+    return `${medal} <@${entry.userId}> • **${entry.net} invites** (*${entry.regular} joins, ${entry.left} leaves*)`;
+  });
+
+  const embed = new EmbedBuilder()
+    .setColor(0xF59E0B)
+    .setTitle('🏆 NISHU STORE // TOP INVITE LEADERBOARD')
+    .setDescription(
+      'Top members who brought the most verified friends and customers to our store server!\n\n' +
+      leaderboardLines.join('\n\n') + '\n\n' +
+      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+      '💡 *Want to climb the leaderboard? Create an invite in Discord and share it with your friends!*'
+    )
+    .setFooter({ text: 'NISHU STORE • Real-Time Invite Leaderboard' })
+    .setTimestamp();
+
+  return interaction.editReply({ embeds: [embed] });
+}
+
+async function handleGetMyInviteLink(interaction) {
+  await interaction.deferReply({ flags: 64 });
+
+  try {
+    const guild = interaction.guild;
+    const channel = interaction.channel || guild.rulesChannel || guild.channels.cache.first();
+
+    // Check if user already has an existing invite link in the guild
+    const existingInvites = await guild.invites.fetch().catch(() => null);
+    let userInvite = null;
+
+    if (existingInvites) {
+      userInvite = existingInvites.find(inv => inv.inviter && inv.inviter.id === interaction.user.id && !inv.maxAge && !inv.maxUses);
+    }
+
+    // If not found, create a new permanent invite link for the user
+    if (!userInvite) {
+      userInvite = await channel.createInvite({
+        maxAge: 0, // Never expire
+        maxUses: 0, // Unlimited uses
+        unique: true,
+        reason: `Personal Invite Link generated for ${interaction.user.tag}`
+      });
+      // Update cache
+      const cached = guildInvitesCache.get(guild.id) || new Map();
+      cached.set(userInvite.code, userInvite.uses);
+      guildInvitesCache.set(guild.id, cached);
+    }
+
+    const inviteUrl = userInvite.url;
+
+    const linkEmbed = new EmbedBuilder()
+      .setColor(0x10B981)
+      .setTitle('🔗 YOUR PERSONAL INVITE LINK')
+      .setDescription(
+        `Here is your unique permanent invite link for **NISHU STORE**:\n\n` +
+        `👉 **${inviteUrl}**\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `**💡 How to use:**\n` +
+        `• Copy and share this link with your friends or on social media.\n` +
+        `• Anyone who joins using this link will **automatically count towards your invite stats**!\n` +
+        `• Check your stats anytime by clicking **"📊 My Stats"**.\n` +
+        `• Reach **25 Invites (Unlimited Data)** or **30 Invites (Free Fire Panel)** to claim prizes!`
+      )
+      .setFooter({ text: 'NISHU STORE • Personal Tracking Active' })
+      .setTimestamp();
+
+    return interaction.editReply({ embeds: [linkEmbed] });
+  } catch (err) {
+    console.error('Error generating personal invite link:', err);
+    return interaction.editReply({
+      content: '❌ Failed to generate invite link! Please check if the bot has "Create Instant Invite" permission.'
+    });
+  }
+}
+
+// ==========================================
+// --- 16. START BOT ---
 // ==========================================
 if (!process.env.DISCORD_TOKEN) {
   console.error('❌ ERROR: DISCORD_TOKEN is missing in your .env file!');

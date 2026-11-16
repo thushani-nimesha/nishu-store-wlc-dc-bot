@@ -9,6 +9,12 @@ A modern Discord Welcome Bot built with **Discord.js v14** and an embedded **Exp
 - 🎨 **Rich Welcome Embeds**: Greets new members with their avatar, username, and real-time server member count.
 - 📜 **Server Rules Link**: Prompts newcomers to check your server's rules channel.
 - ✉️ **DM Welcome Card**: Automatically sends a friendly introductory Direct Message (DM) to new members upon joining.
+- 🛡️ **Instant Auto-Role**: Automatically assigns a default role to newcomers on join (`AUTO_ROLE_ID`).
+- 🔗 **Smart Invite Tracker & Leaderboard (`/invites`, `/inviterank`)**: Tracks real invites, members who leave, and fake invites, with top 10 community leaderboard.
+- ✨ **Smart Auto-Pretty Announcements (`/announce`)**: Turns plain, messy text into ultra-sleek, beautifully styled embeds with auto-titles, auto-formatting, brand emojis, and smart color themes.
+- 🤖 **Configurable Auto-Mod Protection (`/automod`)**: Full owner-controlled anti-invite, anti-external links, fast-message anti-spam, custom word blacklist, and channel/role whitelist.
+- ⭐ **Customer Reviews & Vouches (`/vouch`)**: Allows buyers to rate (1-5 stars), review, and upload proof screenshots with live store average rating calculation.
+- 🎉 **Interactive Giveaway System**: Full `/giveaway start`, `/giveaway end`, and `/giveaway reroll` suite with button entries, auto-timers, and winner DMs.
 - 🌐 **24/7 Keep-Alive HTTP Server**: Built-in `/` endpoint ready to be pinged with free uptime monitoring tools (e.g. UptimeRobot) so the bot stays online 24/7.
 
 ---
