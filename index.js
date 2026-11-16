@@ -3842,38 +3842,39 @@ async function handlePaymentSlipUpload(message) {
 }
 
 async function handlePaymentSlipDecision(interaction) {
-  const isApprove = interaction.customId.startsWith('btn_pay_approve_');
-  const parts = interaction.customId.replace(isApprove ? 'btn_pay_approve_' : 'btn_pay_reject_', '').split('_');
-  const customerId = parts[0];
-  const ticketChannelId = parts[1];
+  try {
+    await interaction.deferUpdate().catch(() => {});
 
-  let guild = interaction.guild;
-  if (!guild) {
-    guild = client.guilds.cache.get(GUILD_ID);
-  }
+    const isApprove = interaction.customId.startsWith('btn_pay_approve_');
+    const parts = interaction.customId.replace(isApprove ? 'btn_pay_approve_' : 'btn_pay_reject_', '').split('_');
+    const customerId = parts[0];
+    const ticketChannelId = parts[1];
 
-  let member = interaction.member;
-  if (!member && guild) {
-    try {
-      member = await guild.members.fetch(interaction.user.id);
-    } catch (e) {}
-  }
+    let guild = interaction.guild;
+    if (!guild) {
+      guild = client.guilds.cache.first();
+    }
 
-  // Check if clicker has Finance Managers role or Admin/Owner
-  const isFinance = member && (
-    member.roles.cache.some(r => r.name.toLowerCase().includes('finance') || STAFF_ROLE_IDS.includes(r.id)) ||
-    interaction.user.id === guild.ownerId ||
-    member.permissions.has(PermissionFlagsBits.Administrator)
-  );
+    let member = interaction.member;
+    if (!member && guild) {
+      try {
+        member = await guild.members.fetch(interaction.user.id);
+      } catch (e) {}
+    }
 
-  if (!isFinance) {
-    return interaction.reply({
-      content: '❌ **Access Denied:** Only members with the **💳・FINANCE MANAGERS** role can approve or reject payments!',
-      flags: 64
-    });
-  }
+    // Check if clicker has Finance Managers role or Admin/Owner
+    const isFinance = member && (
+      member.roles.cache.some(r => r.name.toLowerCase().includes('finance') || STAFF_ROLE_IDS.includes(r.id)) ||
+      interaction.user.id === guild.ownerId ||
+      member.permissions.has(PermissionFlagsBits.Administrator)
+    );
 
-  await interaction.deferUpdate();
+    if (!isFinance) {
+      return interaction.followUp({
+        content: '❌ **Access Denied:** Only members with the **💳・FINANCE MANAGERS** role can approve or reject payments!',
+        flags: 64
+      }).catch(() => {});
+    }
 
   const staffMember = interaction.user;
   const ticketChannel = guild ? (guild.channels.cache.get(ticketChannelId) || await guild.channels.fetch(ticketChannelId).catch(() => null)) : null;
@@ -3965,6 +3966,9 @@ async function handlePaymentSlipDecision(interaction) {
     } catch (dmErr) {
       console.warn('Could not send payment rejection DM to customer:', dmErr.message);
     }
+  }
+  } catch (err) {
+    console.error('Error handling payment slip decision:', err);
   }
 }
 
