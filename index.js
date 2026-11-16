@@ -2253,7 +2253,7 @@ async function setupStoreMenuPanel() {
     products.forEach(p => {
       selectMenu.addOptions({
         label: p.name.slice(0, 70),
-        description: `${p.category} • ${p.delivery}`,
+        description: `${p.priceLKR} • ${p.delivery}`,
         value: p.id,
         emoji: p.categoryEmoji || '🛍️'
       });
@@ -2388,7 +2388,7 @@ async function handleStoreButton(interaction) {
         .setDescription(
           `👋 Welcome ${user}! Thank you for choosing **NISHU STORE**.\n\n` +
           `🛍️ **Selected Product:** **${product ? product.name : 'Custom Order'}**\n` +
-          `💰 **Pricing:** \`Contact Staff in Ticket for Latest Rates\`\n` +
+          `💰 **Price (LKR):** **${product ? product.priceLKR : 'Special Price'}**\n` +
           `⏱️ **Estimated Delivery:** \`${product ? product.delivery : '5-15 Mins'}\`\n` +
           `🛡️ **Warranty:** \`${product ? product.warranty : 'Guaranteed'}\`\n\n` +
           '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
