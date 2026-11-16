@@ -947,6 +947,21 @@ client.on('interactionCreate', async (interaction) => {
       await handleStaffCommand(interaction);
     }
 
+    // 8.10 Finance Analytics Command
+    if (interaction.isChatInputCommand() && interaction.commandName === 'finance') {
+      await handleFinanceCommand(interaction);
+    }
+
+    // Leave a Review / Vouch Modal Opener
+    if (interaction.isButton() && interaction.customId.startsWith('btn_leave_vouch_')) {
+      await handleOpenVouchModal(interaction);
+    }
+
+    // Submit Review / Vouch Modal Handler
+    if (interaction.isModalSubmit() && interaction.customId === 'modal_submit_vouch') {
+      await handleModalVouchSubmit(interaction);
+    }
+
     // Invite & Win Panel Interactive Buttons
     if (interaction.isButton() && interaction.customId === 'btn_get_my_invite_link') {
       await handleGetMyInviteLink(interaction);
@@ -1262,7 +1277,7 @@ async function handleTicketCreate(interaction) {
   }
 }
 
-// Handle Ticket Closing
+// Handle Ticket Closing with Automated Transcript Generator
 async function handleTicketClose(interaction) {
   try {
     const channel = interaction.channel;
@@ -1277,32 +1292,104 @@ async function handleTicketClose(interaction) {
 
     const closeEmbed = new EmbedBuilder()
       .setColor(0xED4245)
-      .setTitle('🔒 Ticket Closing')
-      .setDescription('This ticket will be permanently closed and deleted in **5 seconds**...')
-      .setFooter({ text: 'NISHU STORE • Ticket Management' });
+      .setTitle('🔒 Ticket Closing // Generating Transcript')
+      .setDescription('Saving full conversation transcript and closing ticket in **6 seconds**...')
+      .setFooter({ text: 'NISHU STORE • Ticket Archival System' });
 
     await interaction.reply({ embeds: [closeEmbed] });
 
-    // Send Closed Log to #ticket-logs
+    // 1. Fetch channel messages (up to 100) to build transcript
+    let transcriptText = `=====================================================\n`;
+    transcriptText += `       NISHU STORE • OFFICIAL TICKET TRANSCRIPT       \n`;
+    transcriptText += `=====================================================\n`;
+    transcriptText += `Channel: #${channel.name}\n`;
+    transcriptText += `Topic: ${channel.topic || 'N/A'}\n`;
+    transcriptText += `Closed By: ${interaction.user.tag} (${interaction.user.id})\n`;
+    transcriptText += `Closed At: ${new Date().toISOString()}\n`;
+    transcriptText += `=====================================================\n\n`;
+
+    // Extract ticket owner ID from topic if available
+    let ticketOwnerId = null;
+    if (channel.topic) {
+      const match = channel.topic.match(/\((\d{17,20})\)/);
+      if (match) ticketOwnerId = match[1];
+    }
+
+    try {
+      const fetchedMessages = await channel.messages.fetch({ limit: 100 });
+      const sortedMessages = Array.from(fetchedMessages.values()).sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+
+      for (const msg of sortedMessages) {
+        const timeStr = new Date(msg.createdTimestamp).toLocaleString('en-US', { timeZone: 'Asia/Colombo' });
+        transcriptText += `[${timeStr}] ${msg.author.tag} (${msg.author.id}):\n`;
+        if (msg.content) transcriptText += `  ${msg.content}\n`;
+        if (msg.attachments.size > 0) {
+          msg.attachments.forEach(att => {
+            transcriptText += `  [Attachment: ${att.name || 'file'} - ${att.url}]\n`;
+          });
+        }
+        if (msg.embeds.length > 0) {
+          msg.embeds.forEach(emb => {
+            transcriptText += `  [Embed: ${emb.title || emb.description || 'Rich Content'}]\n`;
+          });
+        }
+        transcriptText += `\n`;
+      }
+    } catch (fetchErr) {
+      console.warn('Could not compile full message transcript:', fetchErr.message);
+      transcriptText += `(Partial transcript: error fetching older messages)\n`;
+    }
+
+    transcriptText += `=====================================================\n`;
+    transcriptText += `END OF TRANSCRIPT • NISHU STORE\n`;
+
+    const transcriptBuffer = Buffer.from(transcriptText, 'utf-8');
+    const transcriptAttachment = new AttachmentBuilder(transcriptBuffer, { name: `transcript-${channel.name}.txt` });
+
+    // 2. Send transcript to Customer DM if ticket owner found
+    if (ticketOwnerId) {
+      try {
+        const ownerUser = await client.users.fetch(ticketOwnerId);
+        if (ownerUser) {
+          const dmCloseEmbed = new EmbedBuilder()
+            .setColor(0x8B5CF6)
+            .setTitle('📦 TICKET CLOSED // YOUR TRANSCRIPT RECEIPT')
+            .setDescription(
+              `Hello ${ownerUser.username}!\n\n` +
+              `Your ticket **#${channel.name}** in **NISHU STORE** has been closed.\n\n` +
+              `📄 We have attached the complete conversation history & receipt for your records.\n\n` +
+              `Thank you for trusting **NISHU STORE**! 💜`
+            )
+            .setFooter({ text: 'NISHU STORE • Automated Order Records' })
+            .setTimestamp();
+
+          await ownerUser.send({ embeds: [dmCloseEmbed], files: [transcriptAttachment] });
+        }
+      } catch (dmErr) {
+        console.warn('Could not send transcript to customer DM:', dmErr.message);
+      }
+    }
+
+    // 3. Send Closed Log & Transcript to #ticket-logs
     const logChannel = client.channels.cache.get(TICKET_LOG_CHANNEL_ID);
     if (logChannel) {
       const closeLog = new EmbedBuilder()
         .setColor(0xED4245)
-        .setTitle('📕 Ticket Closed')
+        .setTitle('📕 Ticket Closed & Archived')
         .addFields(
           { name: '💬 Channel', value: channel.name, inline: true },
           { name: '👤 Closed By', value: `${interaction.user.tag} (${interaction.user.id})`, inline: true },
           { name: 'ℹ️ Topic', value: channel.topic || 'N/A', inline: false }
         )
         .setTimestamp();
-      await logChannel.send({ embeds: [closeLog] }).catch(() => {});
+      await logChannel.send({ embeds: [closeLog], files: [transcriptAttachment] }).catch(() => {});
     }
 
     setTimeout(async () => {
-      await channel.delete('Ticket closed by user or staff').catch(err => {
+      await channel.delete('Ticket closed by user or staff with saved transcript').catch(err => {
         console.error('Error deleting ticket channel:', err);
       });
-    }, 5000);
+    }, 6000);
   } catch (err) {
     console.error('Error closing ticket:', err);
   }
@@ -1574,7 +1661,20 @@ async function registerSlashCommands() {
         .setDescription('🏆 View top 10 members with the most server invites'),
       new SlashCommandBuilder()
         .setName('staff')
-        .setDescription('👥 Check active staff & Finance Managers in Nishu Store')
+        .setDescription('👥 Check active staff & Finance Managers in Nishu Store'),
+      new SlashCommandBuilder()
+        .setName('finance')
+        .setDescription('📊 [FINANCE TEAM] View store revenue, sales analytics & performance reports')
+        .addSubcommand(sub =>
+          sub
+            .setName('summary')
+            .setDescription('View today\'s sales, weekly revenue, and total store statistics')
+        )
+        .addSubcommand(sub =>
+          sub
+            .setName('report')
+            .setDescription('View detailed breakdown of recent verified customer payments')
+        )
     ];
 
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
@@ -3910,66 +4010,331 @@ async function handlePaymentSlipDecision(interaction) {
 
     await ticketChannel.send({ content: `🔔 <@${customerId}>`, embeds: [approvedEmbed] });
 
-    // 2. Direct Message (DM) to Customer
-    try {
-      const customerUser = await client.users.fetch(customerId);
-      if (customerUser) {
-        const dmApproveEmbed = new EmbedBuilder()
-          .setColor(0x10B981)
-          .setTitle('✅ PAYMENT APPROVED // NISHU STORE')
+        // Direct Message (DM) to Customer
+        try {
+          const customerUser = await client.users.fetch(customerId);
+          if (customerUser) {
+            const dmApproveEmbed = new EmbedBuilder()
+              .setColor(0x10B981)
+              .setTitle('✅ PAYMENT APPROVED // NISHU STORE')
+              .setDescription(
+                `Hello ${customerUser.username}!\n\n` +
+                `🎉 **YOUR PAYMENT IS APPROVED!**\n` +
+                `📦 **Within 24 hours your product will be delivered.**\n\n` +
+                `⭐ *Once you receive your product, please click the button below to leave a review / vouch!*`
+              )
+              .setFooter({ text: 'NISHU STORE • Automated Payment Confirmation' })
+              .setTimestamp();
+
+            const dmVouchRow = new ActionRowBuilder().addComponents(
+              new ButtonBuilder()
+                .setCustomId(`btn_leave_vouch_${customerUser.id}`)
+                .setLabel('Leave a Review (⭐)')
+                .setStyle(ButtonStyle.Primary)
+            );
+
+            await customerUser.send({ embeds: [dmApproveEmbed], components: [dmVouchRow] }).catch(() => {});
+          }
+        } catch (dmErr) {
+          console.warn('Could not send payment approval DM to customer:', dmErr.message);
+        }
+
+        // Add 1-click Leave Review button inside Ticket Channel
+        const ticketVouchRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`btn_leave_vouch_${customerId}`)
+            .setLabel('⭐ Leave a Review / Vouch')
+            .setStyle(ButtonStyle.Success)
+        );
+
+        if (ticketChannel) {
+          await ticketChannel.send({
+            content: `⭐ <@${customerId}> **Love your experience with Nishu Store?** Click below to submit your rating & vouch:`,
+            components: [ticketVouchRow]
+          }).catch(() => {});
+        }
+
+        // Save Transaction to Sales Database
+        recordSaleTransaction({
+          customerId,
+          staffId: staffMember.id,
+          staffTag: staffMember.tag || staffMember.username,
+          ticketChannelId,
+          channelName: ticketChannel ? ticketChannel.name : 'ticket',
+          timestamp: Date.now()
+        });
+
+      } else {
+        const rejectedEmbed = new EmbedBuilder()
+          .setColor(0xED4245)
+          .setTitle('❌ PAYMENT SLIP NOT APPROVED')
           .setDescription(
-            `Hello ${customerUser.username}!\n\n` +
-            `🎉 **YOUR PAYMENT IS APPROVED!**\n` +
-            `📦 **Within 24 hours your product will be delivered.**\n\n` +
-            `Thank you for shopping with **NISHU STORE**! 💜`
+            `⚠️ <@${customerId}> **Your payment slip could NOT be verified/approved.**\n\n` +
+            `💳 **Reviewed By:** ${staffMember}\n` +
+            `📝 **Reason:** Invalid transaction, unreadable image, or mismatched amount.\n\n` +
+            '👉 **Please check your payment receipt and upload a clear screenshot, or contact staff below.**'
           )
-          .setFooter({ text: 'NISHU STORE • Automated Payment Confirmation' })
+          .setFooter({ text: 'NISHU STORE • Verification Notice' })
           .setTimestamp();
 
-        await customerUser.send({ embeds: [dmApproveEmbed] });
+        if (ticketChannel) {
+          await ticketChannel.send({ content: `⚠️ <@${customerId}>`, embeds: [rejectedEmbed] }).catch(() => {});
+        }
+
+        // Direct Message (DM) to Customer
+        try {
+          const customerUser = await client.users.fetch(customerId);
+          if (customerUser) {
+            const dmRejectEmbed = new EmbedBuilder()
+              .setColor(0xED4245)
+              .setTitle('❌ PAYMENT NOT APPROVED // NISHU STORE')
+              .setDescription(
+                `Hello ${customerUser.username}!\n\n` +
+                `⚠️ **YOUR PAYMENT IS NOT APPROVED. PLEASE TRY AGAIN.**\n\n` +
+                `Please check your ticket channel in the server or upload a valid transaction receipt.`
+              )
+              .setFooter({ text: 'NISHU STORE • Support Team' })
+              .setTimestamp();
+
+            await customerUser.send({ embeds: [dmRejectEmbed] }).catch(() => {});
+          }
+        } catch (dmErr) {
+          console.warn('Could not send payment rejection DM to customer:', dmErr.message);
+        }
       }
-    } catch (dmErr) {
-      console.warn('Could not send payment approval DM to customer:', dmErr.message);
+    } catch (err) {
+      console.error('Error handling payment slip decision:', err);
     }
-  } else {
-    const rejectedEmbed = new EmbedBuilder()
-      .setColor(0xED4245)
-      .setTitle('❌ PAYMENT SLIP NOT APPROVED')
+}
+
+// ==========================================
+// --- 17.5 SALES & FINANCE ANALYTICS ENGINE ---
+// ==========================================
+const SALES_FILE = path.join(__dirname, 'sales.json');
+
+function loadSales() {
+  try {
+    if (!fs.existsSync(SALES_FILE)) {
+      fs.writeFileSync(SALES_FILE, '[]', 'utf8');
+      return [];
+    }
+    const data = fs.readFileSync(SALES_FILE, 'utf8');
+    return JSON.parse(data) || [];
+  } catch (err) {
+    console.error('Error reading sales.json:', err);
+    return [];
+  }
+}
+
+function saveSales(sales) {
+  try {
+    fs.writeFileSync(SALES_FILE, JSON.stringify(sales, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Error saving sales.json:', err);
+  }
+}
+
+function recordSaleTransaction(saleData) {
+  try {
+    const sales = loadSales();
+    sales.push({
+      id: Date.now().toString(),
+      ...saleData
+    });
+    saveSales(sales);
+  } catch (err) {
+    console.error('Error recording sale transaction:', err);
+  }
+}
+
+async function handleFinanceCommand(interaction) {
+  const guild = interaction.guild || client.guilds.cache.first();
+  let member = interaction.member;
+  if (!member && guild) {
+    try { member = await guild.members.fetch(interaction.user.id); } catch (e) {}
+  }
+
+  const isFinance = member && (
+    member.roles.cache.some(r => r.name.toLowerCase().includes('finance') || STAFF_ROLE_IDS.includes(r.id)) ||
+    interaction.user.id === (guild?.ownerId) ||
+    member.permissions.has(PermissionFlagsBits.Administrator)
+  );
+
+  if (!isFinance) {
+    return interaction.reply({
+      content: '❌ **Access Denied:** Only members with the **💳・FINANCE MANAGERS** role can access financial analytics!',
+      flags: 64
+    });
+  }
+
+  await interaction.deferReply({ flags: 64 });
+
+  const subcommand = interaction.options.getSubcommand();
+  const sales = loadSales();
+  const now = Date.now();
+  const oneDay = 24 * 60 * 60 * 1000;
+  const oneWeek = 7 * oneDay;
+
+  const todaySales = sales.filter(s => (now - s.timestamp) <= oneDay);
+  const weekSales = sales.filter(s => (now - s.timestamp) <= oneWeek);
+
+  if (subcommand === 'summary') {
+    const totalCount = sales.length;
+    const todayCount = todaySales.length;
+    const weekCount = weekSales.length;
+
+    const summaryEmbed = new EmbedBuilder()
+      .setColor(0x10B981)
+      .setTitle('📊 NISHU STORE // FINANCE & REVENUE DASHBOARD')
       .setDescription(
-        `⚠️ <@${customerId}> **Your payment slip could NOT be verified/approved.**\n\n` +
-        `💳 **Reviewed By:** ${staffMember}\n` +
-        `📝 **Reason:** Invalid transaction, unreadable image, or mismatched amount.\n\n` +
-        '👉 **Please check your payment receipt and upload a clear screenshot, or contact staff below.**'
+        'Here is the real-time financial performance and verified sales summary:\n\n' +
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+        `📅 **Today's Verified Orders:** \`${todayCount} orders\`\n` +
+        `📈 **This Week's Verified Orders:** \`${weekCount} orders\`\n` +
+        `📦 **All-Time Verified Orders:** \`${totalCount} orders\`\n` +
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' +
+        '💡 *Use `/finance report` to view the latest approved transactions and customer breakdown.*'
       )
-      .setFooter({ text: 'NISHU STORE • Verification Notice' })
+      .addFields(
+        { name: '💳 Active Finance Team', value: '<@&1571719663639990424>', inline: true },
+        { name: '⚡ Auto Slip Verification', value: '`ONLINE & ACTIVE`', inline: true },
+        { name: '🕒 Last Generated', value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true }
+      )
+      .setFooter({ text: 'NISHU STORE • Official Finance Analytics' })
       .setTimestamp();
 
-    await ticketChannel.send({ content: `⚠️ <@${customerId}>`, embeds: [rejectedEmbed] });
+    return interaction.editReply({ embeds: [summaryEmbed] });
+  }
 
-    // 2. Direct Message (DM) to Customer
+  if (subcommand === 'report') {
+    if (sales.length === 0) {
+      return interaction.editReply({ content: 'ℹ️ No verified sales recorded yet in the database.' });
+    }
+
+    const recent = sales.slice(-10).reverse();
+    let reportDesc = '**Recent 10 Verified Sales:**\n\n';
+
+    recent.forEach((s, idx) => {
+      const timeStr = `<t:${Math.floor(s.timestamp / 1000)}:R>`;
+      reportDesc += `**${idx + 1}.** Customer: <@${s.customerId}> • Verified By: \`${s.staffTag || 'Staff'}\`\n`;
+      reportDesc += `   └ Ticket: \`${s.channelName || 'ticket'}\` • ${timeStr}\n\n`;
+    });
+
+    const reportEmbed = new EmbedBuilder()
+      .setColor(0x8B5CF6)
+      .setTitle('📑 NISHU STORE // DETAILED SALES REPORT')
+      .setDescription(reportDesc)
+      .setFooter({ text: 'NISHU STORE • Finance Ledger' })
+      .setTimestamp();
+
+    return interaction.editReply({ embeds: [reportEmbed] });
+  }
+}
+
+// Interactive Review Modal Opener
+async function handleOpenVouchModal(interaction) {
+  const modal = new ModalBuilder()
+    .setCustomId('modal_submit_vouch')
+    .setTitle('⭐ Leave a Review for Nishu Store');
+
+  const ratingInput = new TextInputBuilder()
+    .setCustomId('vouch_input_rating')
+    .setLabel('Rating (1 to 5 Stars)')
+    .setPlaceholder('Enter 5 for excellent, 4 for good...')
+    .setMinLength(1)
+    .setMaxLength(1)
+    .setValue('5')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true);
+
+  const productInput = new TextInputBuilder()
+    .setCustomId('vouch_input_product')
+    .setLabel('Product / Service Purchased')
+    .setPlaceholder('e.g. ChatGPT Plus, Canva Pro, Free Data...')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true);
+
+  const commentInput = new TextInputBuilder()
+    .setCustomId('vouch_input_comment')
+    .setLabel('Your Review & Feedback')
+    .setPlaceholder('Write your experience with delivery and support...')
+    .setStyle(TextInputStyle.Paragraph)
+    .setRequired(true);
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(ratingInput),
+    new ActionRowBuilder().addComponents(productInput),
+    new ActionRowBuilder().addComponents(commentInput)
+  );
+
+  await interaction.showModal(modal);
+}
+
+// Modal Submit Handler for Vouch / Review
+async function handleModalVouchSubmit(interaction) {
+  await interaction.deferReply({ flags: 64 });
+
+  let rating = parseInt(interaction.fields.getTextInputValue('vouch_input_rating'), 10);
+  if (isNaN(rating) || rating < 1) rating = 1;
+  if (rating > 5) rating = 5;
+
+  const product = interaction.fields.getTextInputValue('vouch_input_product');
+  const comment = interaction.fields.getTextInputValue('vouch_input_comment');
+  const starsString = '⭐'.repeat(rating) + '☆'.repeat(5 - rating);
+
+  const vouches = loadVouches();
+  const newVouch = {
+    id: Date.now().toString(),
+    userId: interaction.user.id,
+    userTag: interaction.user.tag,
+    rating,
+    product,
+    comment,
+    timestamp: Date.now()
+  };
+
+  vouches.push(newVouch);
+  saveVouches(vouches);
+
+  const totalRatings = vouches.reduce((acc, v) => acc + (v.rating || 5), 0);
+  const averageRating = (totalRatings / vouches.length).toFixed(1);
+
+  const guild = interaction.guild || client.guilds.cache.first();
+  let targetChannel = null;
+  if (process.env.VOUCH_CHANNEL_ID && guild) {
+    targetChannel = guild.channels.cache.get(process.env.VOUCH_CHANNEL_ID);
+  }
+  if (!targetChannel && guild) {
+    targetChannel = guild.channels.cache.find(c => c.name.includes('vouch') || c.name.includes('review')) || interaction.channel;
+  }
+
+  const vouchEmbed = new EmbedBuilder()
+    .setColor(rating >= 4 ? 0x10B981 : (rating === 3 ? 0xF59E0B : 0xEF4444))
+    .setTitle('🌟 NEW VERIFIED CUSTOMER REVIEW')
+    .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
+    .addFields(
+      { name: '👤 Verified Customer', value: `${interaction.user} (\`${interaction.user.tag}\`)`, inline: true },
+      { name: '📦 Product', value: `\`${product}\``, inline: true },
+      { name: '⭐ Rating', value: `${starsString} (**${rating}/5**)`, inline: true },
+      { name: '💬 Review', value: comment, inline: false },
+      { name: '📊 Overall Store Rating', value: `⭐ **${averageRating} / 5.0** (${vouches.length} Total Reviews)`, inline: false }
+    )
+    .setFooter({ text: 'NISHU STORE • Verified Purchase Review' })
+    .setTimestamp();
+
+  if (targetChannel) {
     try {
-      const customerUser = await client.users.fetch(customerId);
-      if (customerUser) {
-        const dmRejectEmbed = new EmbedBuilder()
-          .setColor(0xED4245)
-          .setTitle('❌ PAYMENT NOT APPROVED // NISHU STORE')
-          .setDescription(
-            `Hello ${customerUser.username}!\n\n` +
-            `⚠️ **YOUR PAYMENT IS NOT APPROVED. PLEASE TRY AGAIN.**\n\n` +
-            `Please check your ticket channel in the server or upload a valid transaction receipt.`
-          )
-          .setFooter({ text: 'NISHU STORE • Support Team' })
-          .setTimestamp();
-
-        await customerUser.send({ embeds: [dmRejectEmbed] });
-      }
-    } catch (dmErr) {
-      console.warn('Could not send payment rejection DM to customer:', dmErr.message);
+      const posted = await targetChannel.send({ embeds: [vouchEmbed] });
+      await posted.react('❤️').catch(() => {});
+      await posted.react('⭐').catch(() => {});
+    } catch (e) {
+      console.warn('Could not post vouch to channel:', e.message);
     }
   }
-  } catch (err) {
-    console.error('Error handling payment slip decision:', err);
-  }
+
+  return interaction.editReply({
+    content: `🎉 **Thank you so much for your review, ${interaction.user.username}!**\nYour review has been successfully posted in ${targetChannel || 'the reviews channel'}.`
+  });
 }
 
 // ==========================================
