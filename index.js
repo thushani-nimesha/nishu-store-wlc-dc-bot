@@ -26,6 +26,15 @@ const GIFEncoder = require('gif-encoder-2');
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
+const {
+  joinVoiceChannel,
+  createAudioPlayer,
+  createAudioResource,
+  AudioPlayerStatus,
+  VoiceConnectionStatus,
+  entersState
+} = require('@discordjs/voice');
+const play = require('play-dl');
 
 // --- 0. REGISTER MODERN SLEEK TYPOGRAPHY ---
 const winFonts = path.join(process.env.WINDIR || 'C:\\Windows', 'Fonts');
@@ -952,6 +961,32 @@ client.on('interactionCreate', async (interaction) => {
       await handleFinanceCommand(interaction);
     }
 
+    // 8.11 Music Player Slash Commands
+    if (interaction.isChatInputCommand() && interaction.commandName === 'play') {
+      await handleMusicPlayCommand(interaction);
+    }
+
+    if (interaction.isChatInputCommand() && interaction.commandName === 'skip') {
+      await handleMusicSkipCommand(interaction);
+    }
+
+    if (interaction.isChatInputCommand() && interaction.commandName === 'stop') {
+      await handleMusicStopCommand(interaction);
+    }
+
+    if (interaction.isChatInputCommand() && interaction.commandName === 'queue') {
+      await handleMusicQueueCommand(interaction);
+    }
+
+    if (interaction.isChatInputCommand() && interaction.commandName === 'nowplaying') {
+      await handleMusicNowPlayingCommand(interaction);
+    }
+
+    // Music Interactive Controller Buttons
+    if (interaction.isButton() && interaction.customId.startsWith('music_btn_')) {
+      await handleMusicButton(interaction);
+    }
+
     // Leave a Review / Vouch Modal Opener
     if (interaction.isButton() && interaction.customId.startsWith('btn_leave_vouch_')) {
       await handleOpenVouchModal(interaction);
@@ -1683,7 +1718,28 @@ async function registerSlashCommands() {
           sub
             .setName('report')
             .setDescription('View detailed breakdown of recent verified customer payments')
-        )
+        ),
+      new SlashCommandBuilder()
+        .setName('play')
+        .setDescription('🎵 Play any song by name search or YouTube/Spotify URL')
+        .addStringOption(opt =>
+          opt
+            .setName('query')
+            .setDescription('Song title, artist, or YouTube/Spotify link')
+            .setRequired(true)
+        ),
+      new SlashCommandBuilder()
+        .setName('skip')
+        .setDescription('⏭️ Skip the currently playing track'),
+      new SlashCommandBuilder()
+        .setName('stop')
+        .setDescription('⏹️ Stop music, clear queue, and leave voice channel'),
+      new SlashCommandBuilder()
+        .setName('queue')
+        .setDescription('📜 View upcoming songs in the queue'),
+      new SlashCommandBuilder()
+        .setName('nowplaying')
+        .setDescription('🎶 View currently playing track with interactive controls')
     ];
 
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
@@ -4373,6 +4429,352 @@ async function handleModalVouchSubmit(interaction) {
   return interaction.editReply({
     content: `🎉 **Thank you so much for your review, ${interaction.user.username}!**\nYour review has been successfully posted in ${targetChannel || 'the reviews channel'}.`
   });
+}
+
+// ==========================================
+// --- 17.6 ULTRA MUSIC PLAYER SYSTEM ---
+// ==========================================
+// Supports search by song name & direct YouTube/Spotify/SoundCloud links
+const musicGuildQueues = new Map(); // guildId -> MusicQueue instance
+
+class MusicQueue {
+  constructor(guildId, textChannel, voiceChannel) {
+    this.guildId = guildId;
+    this.textChannel = textChannel;
+    this.voiceChannel = voiceChannel;
+    this.songs = [];
+    this.connection = null;
+    this.player = createAudioPlayer();
+    this.isPlaying = false;
+    this.isPaused = false;
+    this.volume = 100;
+
+    this.player.on(AudioPlayerStatus.Idle, () => {
+      this.playNext();
+    });
+
+    this.player.on('error', error => {
+      console.error('Audio Player Error:', error.message);
+      this.playNext();
+    });
+  }
+
+  async connect() {
+    this.connection = joinVoiceChannel({
+      channelId: this.voiceChannel.id,
+      guildId: this.guildId,
+      adapterCreator: this.voiceChannel.guild.voiceAdapterCreator
+    });
+
+    this.connection.subscribe(this.player);
+
+    this.connection.on(VoiceConnectionStatus.Disconnected, async () => {
+      try {
+        await Promise.race([
+          entersState(this.connection, VoiceConnectionStatus.Signalling, 5000),
+          entersState(this.connection, VoiceConnectionStatus.Connecting, 5000)
+        ]);
+      } catch (error) {
+        this.destroy();
+      }
+    });
+  }
+
+  async playNext() {
+    if (this.songs.length === 0) {
+      this.isPlaying = false;
+      const endEmbed = new EmbedBuilder()
+        .setColor(0x8B5CF6)
+        .setTitle('🎶 MUSIC QUEUE FINISHED')
+        .setDescription('All tracks have finished playing. Leaving the voice channel!')
+        .setFooter({ text: 'NISHU MUSIC • High Fidelity Audio' });
+
+      await this.textChannel.send({ embeds: [endEmbed] }).catch(() => {});
+      this.destroy();
+      return;
+    }
+
+    const currentSong = this.songs[0];
+    this.isPlaying = true;
+    this.isPaused = false;
+
+    try {
+      const stream = await play.stream(currentSong.url);
+      const resource = createAudioResource(stream.stream, {
+        inputType: stream.type,
+        inlineVolume: true
+      });
+
+      if (resource.volume) {
+        resource.volume.setVolume(this.volume / 100);
+      }
+
+      this.player.play(resource);
+
+      const playingEmbed = new EmbedBuilder()
+        .setColor(0x8B5CF6)
+        .setTitle('🎶 NOW PLAYING // NISHU MUSIC')
+        .setDescription(`🎵 **[${currentSong.title}](${currentSong.url})**\n\n` +
+          `⏱️ **Duration:** \`${currentSong.durationRaw || 'Live / Unknown'}\`\n` +
+          `👤 **Requested By:** <@${currentSong.requesterId}>\n` +
+          `🔊 **Channel:** ${this.voiceChannel}`)
+        .setThumbnail(currentSong.thumbnail || null)
+        .setFooter({ text: 'NISHU MUSIC • Use buttons below to control playback' })
+        .setTimestamp();
+
+      const controllerRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('music_btn_pause_resume')
+          .setLabel('Pause / Resume')
+          .setEmoji('⏯️')
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+          .setCustomId('music_btn_skip')
+          .setLabel('Skip Track')
+          .setEmoji('⏭️')
+          .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+          .setCustomId('music_btn_stop')
+          .setLabel('Stop & Leave')
+          .setEmoji('⏹️')
+          .setStyle(ButtonStyle.Danger),
+        new ButtonBuilder()
+          .setCustomId('music_btn_queue')
+          .setLabel('Queue')
+          .setEmoji('📜')
+          .setStyle(ButtonStyle.Secondary)
+      );
+
+      await this.textChannel.send({ embeds: [playingEmbed], components: [controllerRow] }).catch(() => {});
+    } catch (err) {
+      console.error('Error starting audio stream:', err.message);
+      this.textChannel.send({ content: `❌ Could not play **${currentSong.title}**: ${err.message}` }).catch(() => {});
+      this.songs.shift();
+      this.playNext();
+    }
+  }
+
+  destroy() {
+    this.songs = [];
+    this.isPlaying = false;
+    if (this.player) this.player.stop();
+    if (this.connection) {
+      this.connection.destroy();
+      this.connection = null;
+    }
+    musicGuildQueues.delete(this.guildId);
+  }
+}
+
+async function handleMusicPlayCommand(interaction) {
+  await interaction.deferReply();
+
+  const member = interaction.member;
+  const voiceChannel = member.voice.channel;
+  if (!voiceChannel) {
+    return interaction.editReply({
+      content: '❌ **You must be in a Voice Channel** to play music!'
+    });
+  }
+
+  const query = interaction.options.getString('query');
+  let queue = musicGuildQueues.get(interaction.guild.id);
+
+  if (!queue) {
+    queue = new MusicQueue(interaction.guild.id, interaction.channel, voiceChannel);
+    musicGuildQueues.set(interaction.guild.id, queue);
+    await queue.connect();
+  }
+
+  try {
+    let song = null;
+
+    // Check if input is a valid URL or a search query
+    const isValidUrl = query.startsWith('http://') || query.startsWith('https://');
+
+    if (isValidUrl) {
+      const urlType = await play.validate(query);
+      if (urlType === 'yt_video' || urlType === 'so_track') {
+        const info = await play.video_basic_info(query);
+        song = {
+          title: info.video_details.title,
+          url: info.video_details.url,
+          durationRaw: info.video_details.durationRaw,
+          thumbnail: info.video_details.thumbnails[0]?.url,
+          requesterId: interaction.user.id
+        };
+      } else {
+        // Fallback search if unsupported URL
+        const searchResults = await play.search(query, { limit: 1 });
+        if (searchResults && searchResults.length > 0) {
+          const item = searchResults[0];
+          song = {
+            title: item.title,
+            url: item.url,
+            durationRaw: item.durationRaw,
+            thumbnail: item.thumbnails[0]?.url,
+            requesterId: interaction.user.id
+          };
+        }
+      }
+    } else {
+      // Direct Song Search by Name
+      const searchResults = await play.search(query, { limit: 1 });
+      if (!searchResults || searchResults.length === 0) {
+        return interaction.editReply({
+          content: `❌ No songs found matching **"${query}"**. Please try another title!`
+        });
+      }
+      const item = searchResults[0];
+      song = {
+        title: item.title,
+        url: item.url,
+        durationRaw: item.durationRaw,
+        thumbnail: item.thumbnails[0]?.url,
+        requesterId: interaction.user.id
+      };
+    }
+
+    if (!song) {
+      return interaction.editReply({ content: '❌ Could not retrieve audio for this request.' });
+    }
+
+    queue.songs.push(song);
+
+    if (!queue.isPlaying) {
+      await interaction.editReply({
+        content: `🎶 Starting playback for **${song.title}** in ${voiceChannel}!`
+      });
+      queue.playNext();
+    } else {
+      const addedEmbed = new EmbedBuilder()
+        .setColor(0x10B981)
+        .setTitle('➕ ADDED TO QUEUE // NISHU MUSIC')
+        .setDescription(`🎵 **[${song.title}](${song.url})**\n\n` +
+          `⏱️ **Duration:** \`${song.durationRaw || 'Unknown'}\`\n` +
+          `📍 **Position in Queue:** \`#${queue.songs.length}\`\n` +
+          `👤 **Requested By:** ${interaction.user}`)
+        .setThumbnail(song.thumbnail || null)
+        .setFooter({ text: 'NISHU MUSIC • Song Queued' });
+
+      return interaction.editReply({ embeds: [addedEmbed] });
+    }
+  } catch (err) {
+    console.error('Error in handleMusicPlayCommand:', err);
+    return interaction.editReply({
+      content: `❌ Error playing song: ${err.message}`
+    });
+  }
+}
+
+async function handleMusicSkipCommand(interaction) {
+  const queue = musicGuildQueues.get(interaction.guild.id);
+  if (!queue || !queue.isPlaying) {
+    return interaction.reply({ content: '❌ There is no music playing right now!', flags: 64 });
+  }
+
+  const skipped = queue.songs.shift();
+  queue.player.stop();
+  return interaction.reply({
+    content: `⏭️ **Skipped:** \`${skipped?.title || 'Current Song'}\`!`
+  });
+}
+
+async function handleMusicStopCommand(interaction) {
+  const queue = musicGuildQueues.get(interaction.guild.id);
+  if (!queue) {
+    return interaction.reply({ content: '❌ Nishu Bot is not in a voice channel!', flags: 64 });
+  }
+
+  queue.destroy();
+  return interaction.reply({
+    content: '⏹️ **Stopped playback, cleared the queue, and disconnected from Voice!**'
+  });
+}
+
+async function handleMusicQueueCommand(interaction) {
+  const queue = musicGuildQueues.get(interaction.guild.id);
+  if (!queue || queue.songs.length === 0) {
+    return interaction.reply({ content: '📜 The music queue is currently empty!', flags: 64 });
+  }
+
+  const current = queue.songs[0];
+  const upcoming = queue.songs.slice(1, 11);
+
+  let desc = `🎶 **Currently Playing:**\n**[${current.title}](${current.url})** (\`${current.durationRaw}\`) • <@${current.requesterId}>\n\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `📜 **Upcoming Tracks (${queue.songs.length - 1} in queue):**\n`;
+
+  if (upcoming.length === 0) {
+    desc += '*No more songs in queue. Add more using `/play`!*\n';
+  } else {
+    upcoming.forEach((s, idx) => {
+      desc += `**${idx + 1}.** [${s.title}](${s.url}) (\`${s.durationRaw}\`)\n`;
+    });
+  }
+
+  const queueEmbed = new EmbedBuilder()
+    .setColor(0x8B5CF6)
+    .setTitle('📜 NISHU MUSIC // QUEUE LIST')
+    .setDescription(desc)
+    .setFooter({ text: 'NISHU MUSIC • 24/7 Voice Entertainment' })
+    .setTimestamp();
+
+  return interaction.reply({ embeds: [queueEmbed] });
+}
+
+async function handleMusicNowPlayingCommand(interaction) {
+  const queue = musicGuildQueues.get(interaction.guild.id);
+  if (!queue || !queue.isPlaying) {
+    return interaction.reply({ content: '❌ There is no song currently playing!', flags: 64 });
+  }
+
+  const song = queue.songs[0];
+  const npEmbed = new EmbedBuilder()
+    .setColor(0x8B5CF6)
+    .setTitle('🎶 CURRENTLY PLAYING')
+    .setDescription(`🎵 **[${song.title}](${song.url})**\n\n` +
+      `⏱️ **Duration:** \`${song.durationRaw || 'Live'}\`\n` +
+      `👤 **Requested By:** <@${song.requesterId}>\n` +
+      `🔊 **Status:** \`${queue.isPaused ? 'Paused ⏸️' : 'Playing ▶️'}\``)
+    .setThumbnail(song.thumbnail || null)
+    .setFooter({ text: 'NISHU MUSIC • High Quality Audio Engine' });
+
+  return interaction.reply({ embeds: [npEmbed] });
+}
+
+async function handleMusicButton(interaction) {
+  const queue = musicGuildQueues.get(interaction.guild.id);
+  if (!queue) {
+    return interaction.reply({ content: '❌ There is no active music session!', flags: 64 });
+  }
+
+  if (interaction.customId === 'music_btn_pause_resume') {
+    if (queue.isPaused) {
+      queue.player.unpause();
+      queue.isPaused = false;
+      return interaction.reply({ content: '▶️ Resumed music playback!', flags: 64 });
+    } else {
+      queue.player.pause();
+      queue.isPaused = true;
+      return interaction.reply({ content: '⏸️ Paused music playback!', flags: 64 });
+    }
+  }
+
+  if (interaction.customId === 'music_btn_skip') {
+    const skipped = queue.songs.shift();
+    queue.player.stop();
+    return interaction.reply({ content: `⏭️ Skipped **${skipped?.title || 'track'}**!`, flags: 64 });
+  }
+
+  if (interaction.customId === 'music_btn_stop') {
+    queue.destroy();
+    return interaction.reply({ content: '⏹️ Stopped music and disconnected!', flags: 64 });
+  }
+
+  if (interaction.customId === 'music_btn_queue') {
+    return handleMusicQueueCommand(interaction);
+  }
 }
 
 // ==========================================
