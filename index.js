@@ -4607,11 +4607,34 @@ async function handleMusicPlayCommand(interaction) {
     let song = null;
 
     // Check if input is a valid URL or a search query
-    const isValidUrl = query.startsWith('http://') || query.startsWith('https://');
+    // Helper: Extract YouTube ID from any link
+    function extractVideoId(url) {
+      const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+      return match ? match[1] : null;
+    }
 
-    if (isValidUrl && ytdl.validateURL(query)) {
+    const videoId = isValidUrl ? extractVideoId(query) : null;
+
+    if (videoId) {
       try {
-        const info = await ytdl.getBasicInfo(query);
+        const videoInfo = await ytSearch({ videoId }).catch(() => null);
+        if (videoInfo) {
+          song = {
+            title: videoInfo.title,
+            url: videoInfo.url || `https://www.youtube.com/watch?v=${videoId}`,
+            durationRaw: videoInfo.timestamp || `${Math.floor(videoInfo.duration?.seconds / 60)}:${(videoInfo.duration?.seconds % 60 || 0).toString().padStart(2, '0')}`,
+            thumbnail: videoInfo.thumbnail || videoInfo.image,
+            requesterId: interaction.user.id
+          };
+        }
+      } catch (e) {
+        console.warn('ytSearch by videoId error:', e.message);
+      }
+    }
+
+    if (!song && isValidUrl && ytdl.validateURL(query)) {
+      try {
+        const info = await ytdl.getBasicInfo(query).catch(() => null);
         if (info && info.videoDetails) {
           song = {
             title: info.videoDetails.title,
@@ -4622,12 +4645,12 @@ async function handleMusicPlayCommand(interaction) {
           };
         }
       } catch (e) {
-        console.warn('ytdl getBasicInfo error, falling back to search:', e.message);
+        console.warn('ytdl getBasicInfo error:', e.message);
       }
     }
 
     if (!song) {
-      // Use Ultra-Fast yt-search
+      // Use Ultra-Fast yt-search for keywords/titles
       const searchRes = await ytSearch(query).catch(() => null);
       if (searchRes && searchRes.videos && searchRes.videos.length > 0) {
         const video = searchRes.videos[0];
