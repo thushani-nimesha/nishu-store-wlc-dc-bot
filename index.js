@@ -34,7 +34,8 @@ const {
   VoiceConnectionStatus,
   entersState
 } = require('@discordjs/voice');
-const play = require('play-dl');
+const ytdl = require('@distube/ytdl-core');
+const YouTube = require('youtube-sr').default;
 
 // --- 0. REGISTER MODERN SLEEK TYPOGRAPHY ---
 const winFonts = path.join(process.env.WINDIR || 'C:\\Windows', 'Fonts');
@@ -4511,9 +4512,13 @@ class MusicQueue {
     this.isPaused = false;
 
     try {
-      const stream = await play.stream(currentSong.url);
-      const resource = createAudioResource(stream.stream, {
-        inputType: stream.type,
+      const stream = ytdl(currentSong.url, {
+        filter: 'audioonly',
+        quality: 'highestaudio',
+        highWaterMark: 1 << 25
+      });
+
+      const resource = createAudioResource(stream, {
         inlineVolume: true
       });
 
@@ -4604,58 +4609,41 @@ async function handleMusicPlayCommand(interaction) {
     // Check if input is a valid URL or a search query
     const isValidUrl = query.startsWith('http://') || query.startsWith('https://');
 
-    if (isValidUrl) {
+    if (isValidUrl && ytdl.validateURL(query)) {
       try {
-        const urlType = await play.validate(query);
-        if (urlType === 'yt_video' || query.includes('youtu.be') || query.includes('youtube.com')) {
-          const info = await play.video_basic_info(query).catch(() => null);
-          if (info && info.video_details) {
-            song = {
-              title: info.video_details.title,
-              url: info.video_details.url,
-              durationRaw: info.video_details.durationRaw,
-              thumbnail: info.video_details.thumbnails[0]?.url,
-              requesterId: interaction.user.id
-            };
-          }
-        }
-      } catch (e) {
-        console.warn('URL validate error, falling back to search:', e.message);
-      }
-
-      if (!song) {
-        const searchResults = await play.search(query, { limit: 1 }).catch(() => []);
-        if (searchResults && searchResults.length > 0) {
-          const item = searchResults[0];
+        const info = await ytdl.getBasicInfo(query);
+        if (info && info.videoDetails) {
           song = {
-            title: item.title,
-            url: item.url,
-            durationRaw: item.durationRaw,
-            thumbnail: item.thumbnails[0]?.url,
+            title: info.videoDetails.title,
+            url: info.videoDetails.video_url,
+            durationRaw: `${Math.floor(info.videoDetails.lengthSeconds / 60)}:${(info.videoDetails.lengthSeconds % 60).toString().padStart(2, '0')}`,
+            thumbnail: info.videoDetails.thumbnails[0]?.url,
             requesterId: interaction.user.id
           };
         }
+      } catch (e) {
+        console.warn('ytdl getBasicInfo error, falling back to search:', e.message);
       }
-    } else {
-      // Direct Song Search by Name
-      const searchResults = await play.search(query, { limit: 1 });
-      if (!searchResults || searchResults.length === 0) {
-        return interaction.editReply({
-          content: `❌ No songs found matching **"${query}"**. Please try another title!`
-        });
-      }
-      const item = searchResults[0];
-      song = {
-        title: item.title,
-        url: item.url,
-        durationRaw: item.durationRaw,
-        thumbnail: item.thumbnails[0]?.url,
-        requesterId: interaction.user.id
-      };
     }
 
     if (!song) {
-      return interaction.editReply({ content: '❌ Could not retrieve audio for this request.' });
+      // Use YouTube Search (youtube-sr)
+      const searchResult = await YouTube.searchOne(query).catch(() => null);
+      if (searchResult) {
+        song = {
+          title: searchResult.title,
+          url: searchResult.url,
+          durationRaw: searchResult.durationFormatted,
+          thumbnail: searchResult.thumbnail?.url,
+          requesterId: interaction.user.id
+        };
+      }
+    }
+
+    if (!song) {
+      return interaction.editReply({
+        content: `❌ No songs found matching **"${query}"**. Please try another title or link!`
+      });
     }
 
     queue.songs.push(song);
