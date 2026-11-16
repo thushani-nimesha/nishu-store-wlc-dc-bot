@@ -3797,11 +3797,45 @@ async function handlePaymentSlipUpload(message) {
         .setStyle(ButtonStyle.Danger)
     );
 
+    // Send in Ticket Channel
     await ticketChannel.send({
       content: `🔔 ${financeMention} **New Payment Slip Uploaded by ${customer}!**`,
       embeds: [verifyEmbed],
       components: [actionRow]
     });
+
+    // Send direct Private DM to every member who has the Finance Role
+    try {
+      if (financeRole) {
+        // Fetch members to ensure full cache
+        await guild.members.fetch();
+        const financeMembers = financeRole.members;
+        
+        const dmFinanceEmbed = new EmbedBuilder()
+          .setColor(0xF59E0B)
+          .setTitle('🚨 NEW PAYMENT SLIP TO VERIFY // NISHU STORE')
+          .setDescription(
+            `Hey Finance Team! Customer ${customer} (\`${customer.tag}\`) just uploaded a payment slip.\n\n` +
+            `💬 **Ticket Channel:** ${ticketChannel.name} (<#${ticketChannel.id}>)\n` +
+            `👤 **Customer ID:** \`${customer.id}\`\n\n` +
+            `👉 You can approve or reject directly from this DM or from the ticket channel!`
+          )
+          .setImage(slipAttachment.url)
+          .setFooter({ text: 'NISHU STORE • Finance Alert' })
+          .setTimestamp();
+
+        for (const [_, member] of financeMembers) {
+          if (!member.user.bot) {
+            await member.send({
+              embeds: [dmFinanceEmbed],
+              components: [actionRow]
+            }).catch(e => console.warn(`Could not send DM to finance member ${member.user.tag}:`, e.message));
+          }
+        }
+      }
+    } catch (dmErr) {
+      console.warn('Error sending DM to finance role members:', dmErr.message);
+    }
   } catch (err) {
     console.error('Error handling payment slip upload:', err);
   }
@@ -3813,10 +3847,24 @@ async function handlePaymentSlipDecision(interaction) {
   const customerId = parts[0];
   const ticketChannelId = parts[1];
 
+  let guild = interaction.guild;
+  if (!guild) {
+    guild = client.guilds.cache.get(GUILD_ID);
+  }
+
+  let member = interaction.member;
+  if (!member && guild) {
+    try {
+      member = await guild.members.fetch(interaction.user.id);
+    } catch (e) {}
+  }
+
   // Check if clicker has Finance Managers role or Admin/Owner
-  const isFinance = interaction.member.roles.cache.some(r => 
-    r.name.toLowerCase().includes('finance') || STAFF_ROLE_IDS.includes(r.id)
-  ) || interaction.user.id === interaction.guild.ownerId || interaction.member.permissions.has(PermissionFlagsBits.Administrator);
+  const isFinance = member && (
+    member.roles.cache.some(r => r.name.toLowerCase().includes('finance') || STAFF_ROLE_IDS.includes(r.id)) ||
+    interaction.user.id === guild.ownerId ||
+    member.permissions.has(PermissionFlagsBits.Administrator)
+  );
 
   if (!isFinance) {
     return interaction.reply({
@@ -3827,9 +3875,8 @@ async function handlePaymentSlipDecision(interaction) {
 
   await interaction.deferUpdate();
 
-  const guild = interaction.guild;
   const staffMember = interaction.user;
-  const ticketChannel = guild.channels.cache.get(ticketChannelId) || interaction.channel;
+  const ticketChannel = guild ? (guild.channels.cache.get(ticketChannelId) || await guild.channels.fetch(ticketChannelId).catch(() => null)) : null;
 
   // Disable buttons on the original message
   const disabledRow = new ActionRowBuilder().addComponents(
