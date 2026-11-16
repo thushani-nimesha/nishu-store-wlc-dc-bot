@@ -2253,7 +2253,7 @@ async function setupStoreMenuPanel() {
     products.forEach(p => {
       selectMenu.addOptions({
         label: p.name.slice(0, 70),
-        description: `${p.priceLKR} (${p.priceUSD}) • ${p.delivery}`,
+        description: `${p.category} • ${p.delivery}`,
         value: p.id,
         emoji: p.categoryEmoji || '🛍️'
       });
@@ -2302,8 +2302,7 @@ async function handleStoreSelect(interaction) {
     const btnRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`store_btn_buy_${product.id}`)
-        .setLabel(`Buy Now • ${product.priceLKR}`)
-        .setEmoji('🛒')
+        .setLabel('🛒 Order / Buy Now')
         .setStyle(ButtonStyle.Success)
         .setDisabled(!product.inStock),
       new ButtonBuilder()
@@ -2389,7 +2388,7 @@ async function handleStoreButton(interaction) {
         .setDescription(
           `👋 Welcome ${user}! Thank you for choosing **NISHU STORE**.\n\n` +
           `🛍️ **Selected Product:** **${product ? product.name : 'Custom Order'}**\n` +
-          `💰 **Total Due:** **${product ? product.priceLKR + ' (' + product.priceUSD + ')' : 'See Pricing'}**\n` +
+          `💰 **Pricing:** \`Contact Staff in Ticket for Latest Rates\`\n` +
           `⏱️ **Estimated Delivery:** \`${product ? product.delivery : '5-15 Mins'}\`\n` +
           `🛡️ **Warranty:** \`${product ? product.warranty : 'Guaranteed'}\`\n\n` +
           '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
