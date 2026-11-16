@@ -3780,29 +3780,45 @@ async function handleGetMyInviteLink(interaction) {
     const guild = interaction.guild;
     const channel = interaction.channel || guild.rulesChannel || guild.channels.cache.first();
 
-    // Check if user already has an existing invite link in the guild
-    const existingInvites = await guild.invites.fetch().catch(() => null);
-    let userInvite = null;
-
-    if (existingInvites) {
-      userInvite = existingInvites.find(inv => inv.inviter && inv.inviter.id === interaction.user.id && !inv.maxAge && !inv.maxUses);
+    const allData = loadInvitesData();
+    if (!allData[interaction.user.id]) {
+      allData[interaction.user.id] = { regular: 0, left: 0, fake: 0, total: 0 };
     }
 
-    // If not found, create a new permanent invite link for the user
+    let inviteUrl = allData[interaction.user.id].inviteUrl;
+    let userInvite = null;
+
+    const existingInvites = await guild.invites.fetch().catch(() => null);
+
+    // If we have a saved code, verify it still exists in the guild
+    if (inviteUrl && existingInvites) {
+      const code = inviteUrl.split('/').pop();
+      userInvite = existingInvites.get(code);
+    }
+
+    // If not found in memory/database, look for any permanent invite by this user
+    if (!userInvite && existingInvites) {
+      userInvite = existingInvites.find(inv => inv.inviter && inv.inviter.id === interaction.user.id && (inv.maxAge === 0 || !inv.maxAge) && (inv.maxUses === 0 || !inv.maxUses));
+    }
+
+    // If still no invite exists, create ONE single permanent invite link for this user
     if (!userInvite) {
       userInvite = await channel.createInvite({
         maxAge: 0, // Never expire
         maxUses: 0, // Unlimited uses
-        unique: true,
-        reason: `Personal Invite Link generated for ${interaction.user.tag}`
+        unique: false, // Re-use standard invite code if possible
+        reason: `Permanent Invite Link for ${interaction.user.tag}`
       });
-      // Update cache
+
+      // Update in-memory tracking cache
       const cached = guildInvitesCache.get(guild.id) || new Map();
       cached.set(userInvite.code, userInvite.uses);
       guildInvitesCache.set(guild.id, cached);
     }
 
-    const inviteUrl = userInvite.url;
+    inviteUrl = userInvite.url;
+    allData[interaction.user.id].inviteUrl = inviteUrl;
+    saveInvitesData(allData);
 
     const linkEmbed = new EmbedBuilder()
       .setColor(0x10B981)
