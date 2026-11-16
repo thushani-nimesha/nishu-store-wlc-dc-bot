@@ -960,6 +960,27 @@ client.on('interactionCreate', async (interaction) => {
       await handleInviteRankCommand(interaction);
     }
 
+    // Instant Copy Bank Details Buttons in Order Tickets
+    if (interaction.isButton() && interaction.customId === 'btn_copy_bank_info') {
+      return interaction.reply({
+        content: 
+          '```\n' +
+          'Bank: Bank of Ceylon (BOC)\n' +
+          'Account Number: 96293434\n' +
+          'Account Name: E M M H S B EKANAYAKE\n' +
+          'Branch: Peradeniya\n' +
+          '```',
+        flags: 64
+      });
+    }
+
+    if (interaction.isButton() && interaction.customId === 'btn_copy_account_num') {
+      return interaction.reply({
+        content: '`96293434`\n*(Long press or double-click to copy account number!)*',
+        flags: 64
+      });
+    }
+
     // Giveaway Entry Button
     if (interaction.isButton() && interaction.customId.startsWith('giveaway_enter_')) {
       await handleGiveawayButton(interaction);
@@ -2569,8 +2590,16 @@ async function handleStoreButton(interaction) {
 
       const orderRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
+          .setCustomId('btn_copy_bank_info')
+          .setLabel('📋 Copy Bank Info')
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+          .setCustomId('btn_copy_account_num')
+          .setLabel('🔢 Copy Account No (96293434)')
+          .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
           .setCustomId('ticket_close')
-          .setLabel('Close Order Ticket')
+          .setLabel('Close Ticket')
           .setEmoji('🔒')
           .setStyle(ButtonStyle.Danger)
       );
