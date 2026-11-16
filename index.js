@@ -981,6 +981,11 @@ client.on('interactionCreate', async (interaction) => {
       });
     }
 
+    // Payment Slip Verification Buttons (Finance Team)
+    if (interaction.isButton() && (interaction.customId.startsWith('btn_pay_approve_') || interaction.customId.startsWith('btn_pay_reject_'))) {
+      await handlePaymentSlipDecision(interaction);
+    }
+
     // Giveaway Entry Button
     if (interaction.isButton() && interaction.customId.startsWith('giveaway_enter_')) {
       await handleGiveawayButton(interaction);
@@ -3258,11 +3263,20 @@ async function handleAutoModCommand(interaction) {
   }
 }
 
-// --- MESSAGE LISTENER FOR AUTO-MOD ---
+// --- MESSAGE LISTENER FOR AUTO-MOD & TICKET PAYMENT SLIPS ---
 client.on('messageCreate', async (message) => {
   try {
     // Ignore bots and direct messages
     if (!message.guild || message.author.bot) return;
+
+    // A. DETECT PAYMENT SLIP UPLOAD IN ORDER / SUPPORT TICKETS
+    if (message.channel.parentId === TICKET_CATEGORY_ID && message.attachments.size > 0) {
+      const isImage = message.attachments.some(a => a.contentType && a.contentType.startsWith('image/'));
+      if (isImage) {
+        await handlePaymentSlipUpload(message);
+        return; // Processed as payment slip, skip automod
+      }
+    }
 
     // Check if user is Server Owner or Admin (Always bypassed)
     if (message.author.id === message.guild.ownerId || message.member?.permissions.has(PermissionFlagsBits.Administrator)) {
@@ -3733,7 +3747,182 @@ async function handleStaffCommand(interaction) {
 }
 
 // ==========================================
-// --- 16. START BOT ---
+// --- 17. AUTOMATED PAYMENT SLIP VERIFICATION SYSTEM ---
+// ==========================================
+
+async function handlePaymentSlipUpload(message) {
+  try {
+    const slipAttachment = message.attachments.find(a => a.contentType && a.contentType.startsWith('image/'));
+    if (!slipAttachment) return;
+
+    const guild = message.guild;
+    const customer = message.author;
+    const ticketChannel = message.channel;
+
+    // React to slip upload
+    await message.react('🧾').catch(() => {});
+    await message.react('⏳').catch(() => {});
+
+    // Find Finance Managers Role
+    const financeRole = guild.roles.cache.find(r => 
+      r.name.toLowerCase().includes('finance manager') || r.name.toLowerCase().includes('finance')
+    );
+    const financeMention = financeRole ? `${financeRole}` : '@Finance Team';
+
+    const verifyEmbed = new EmbedBuilder()
+      .setColor(0xF59E0B)
+      .setTitle('🧾 PAYMENT SLIP SUBMITTED // ACTION REQUIRED')
+      .setDescription(
+        `👋 ${financeMention}, a payment receipt has been uploaded for verification!\n\n` +
+        `👤 **Customer:** ${customer} (\`${customer.tag}\`)\n` +
+        `💬 **Ticket Channel:** ${ticketChannel}\n` +
+        `⏰ **Submitted At:** <t:${Math.floor(Date.now() / 1000)}:R>\n\n` +
+        '👇 **Please check the attached payment slip and select an action:**'
+      )
+      .setImage(slipAttachment.url)
+      .setFooter({ text: 'NISHU STORE • Finance Verification Desk' })
+      .setTimestamp();
+
+    // Verification Buttons for Finance Team (Stores customerId and ticketChannelId in customId)
+    const actionRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`btn_pay_approve_${customer.id}_${ticketChannel.id}`)
+        .setLabel('Approve Payment')
+        .setEmoji('✅')
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId(`btn_pay_reject_${customer.id}_${ticketChannel.id}`)
+        .setLabel('Reject Slip')
+        .setEmoji('❌')
+        .setStyle(ButtonStyle.Danger)
+    );
+
+    await ticketChannel.send({
+      content: `🔔 ${financeMention} **New Payment Slip Uploaded by ${customer}!**`,
+      embeds: [verifyEmbed],
+      components: [actionRow]
+    });
+  } catch (err) {
+    console.error('Error handling payment slip upload:', err);
+  }
+}
+
+async function handlePaymentSlipDecision(interaction) {
+  const isApprove = interaction.customId.startsWith('btn_pay_approve_');
+  const parts = interaction.customId.replace(isApprove ? 'btn_pay_approve_' : 'btn_pay_reject_', '').split('_');
+  const customerId = parts[0];
+  const ticketChannelId = parts[1];
+
+  // Check if clicker has Finance Managers role or Admin/Owner
+  const isFinance = interaction.member.roles.cache.some(r => 
+    r.name.toLowerCase().includes('finance') || STAFF_ROLE_IDS.includes(r.id)
+  ) || interaction.user.id === interaction.guild.ownerId || interaction.member.permissions.has(PermissionFlagsBits.Administrator);
+
+  if (!isFinance) {
+    return interaction.reply({
+      content: '❌ **Access Denied:** Only members with the **💳・FINANCE MANAGERS** role can approve or reject payments!',
+      flags: 64
+    });
+  }
+
+  await interaction.deferUpdate();
+
+  const guild = interaction.guild;
+  const staffMember = interaction.user;
+  const ticketChannel = guild.channels.cache.get(ticketChannelId) || interaction.channel;
+
+  // Disable buttons on the original message
+  const disabledRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('btn_done_action')
+      .setLabel(isApprove ? `Approved by ${staffMember.username}` : `Rejected by ${staffMember.username}`)
+      .setEmoji(isApprove ? '✅' : '❌')
+      .setStyle(isApprove ? ButtonStyle.Success : ButtonStyle.Danger)
+      .setDisabled(true)
+  );
+
+  try {
+    await interaction.message.edit({ components: [disabledRow] });
+  } catch (e) {}
+
+  // 1. Send update inside Ticket Channel
+  if (isApprove) {
+    const approvedEmbed = new EmbedBuilder()
+      .setColor(0x10B981)
+      .setTitle('✅ PAYMENT VERIFIED & APPROVED!')
+      .setDescription(
+        `🎉 <@${customerId}> **Your payment slip has been officially APPROVED!**\n\n` +
+        `💳 **Verified By:** ${staffMember}\n` +
+        `📦 **Status:** \`Processing Delivery\`\n` +
+        `⚡ **Delivery Time:** **Within 24 Hours (Usually within a few minutes)**\n\n` +
+        'Our team is now preparing your product login credentials/keys. Please stay tuned!'
+      )
+      .setFooter({ text: 'NISHU STORE • Order Approved' })
+      .setTimestamp();
+
+    await ticketChannel.send({ content: `🔔 <@${customerId}>`, embeds: [approvedEmbed] });
+
+    // 2. Direct Message (DM) to Customer
+    try {
+      const customerUser = await client.users.fetch(customerId);
+      if (customerUser) {
+        const dmApproveEmbed = new EmbedBuilder()
+          .setColor(0x10B981)
+          .setTitle('✅ PAYMENT APPROVED // NISHU STORE')
+          .setDescription(
+            `Hello ${customerUser.username}!\n\n` +
+            `🎉 **YOUR PAYMENT IS APPROVED!**\n` +
+            `📦 **Within 24 hours your product will be delivered.**\n\n` +
+            `Thank you for shopping with **NISHU STORE**! 💜`
+          )
+          .setFooter({ text: 'NISHU STORE • Automated Payment Confirmation' })
+          .setTimestamp();
+
+        await customerUser.send({ embeds: [dmApproveEmbed] });
+      }
+    } catch (dmErr) {
+      console.warn('Could not send payment approval DM to customer:', dmErr.message);
+    }
+  } else {
+    const rejectedEmbed = new EmbedBuilder()
+      .setColor(0xED4245)
+      .setTitle('❌ PAYMENT SLIP NOT APPROVED')
+      .setDescription(
+        `⚠️ <@${customerId}> **Your payment slip could NOT be verified/approved.**\n\n` +
+        `💳 **Reviewed By:** ${staffMember}\n` +
+        `📝 **Reason:** Invalid transaction, unreadable image, or mismatched amount.\n\n` +
+        '👉 **Please check your payment receipt and upload a clear screenshot, or contact staff below.**'
+      )
+      .setFooter({ text: 'NISHU STORE • Verification Notice' })
+      .setTimestamp();
+
+    await ticketChannel.send({ content: `⚠️ <@${customerId}>`, embeds: [rejectedEmbed] });
+
+    // 2. Direct Message (DM) to Customer
+    try {
+      const customerUser = await client.users.fetch(customerId);
+      if (customerUser) {
+        const dmRejectEmbed = new EmbedBuilder()
+          .setColor(0xED4245)
+          .setTitle('❌ PAYMENT NOT APPROVED // NISHU STORE')
+          .setDescription(
+            `Hello ${customerUser.username}!\n\n` +
+            `⚠️ **YOUR PAYMENT IS NOT APPROVED. PLEASE TRY AGAIN.**\n\n` +
+            `Please check your ticket channel in the server or upload a valid transaction receipt.`
+          )
+          .setFooter({ text: 'NISHU STORE • Support Team' })
+          .setTimestamp();
+
+        await customerUser.send({ embeds: [dmRejectEmbed] });
+      }
+    } catch (dmErr) {
+      console.warn('Could not send payment rejection DM to customer:', dmErr.message);
+    }
+  }
+}
+
+// ==========================================
+// --- 18. START BOT ---
 // ==========================================
 if (!process.env.DISCORD_TOKEN) {
   console.error('❌ ERROR: DISCORD_TOKEN is missing in your .env file!');
