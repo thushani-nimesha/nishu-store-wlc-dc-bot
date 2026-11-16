@@ -335,6 +335,7 @@ client.once('clientReady', async () => {
   registerSlashCommands();
   initGiveaways();
   loadServerInvites();
+  ensureFinanceRole();
 });
 
 client.once('ready', () => {
@@ -882,13 +883,44 @@ const TICKET_CATEGORY_ID = process.env.TICKET_CATEGORY_ID || '156696781886652421
 const TICKET_PANEL_CHANNEL_ID = process.env.TICKET_PANEL_CHANNEL_ID || '1566968095422287912';
 const TICKET_LOG_CHANNEL_ID = process.env.TICKET_LOG_CHANNEL_ID || '1566975747879477299';
 
-// Staff Roles with ticket access
-const STAFF_ROLE_IDS = [
+// Staff Roles with ticket access (Dynamically populated with FINANCE MANAGERS)
+let STAFF_ROLE_IDS = [
   '1566955712851222699', // 👑 OWNER
   '1566956388213850153', // 💜 STORE MANAGER
   '1566956542933213345', // 🛡️ ADMIN
   '1566956709115728083'  // 🎫 SUPPORT TEAM
 ];
+
+// Automatically ensure '💳・FINANCE MANAGERS' role exists and has staff access
+async function ensureFinanceRole() {
+  try {
+    const guild = client.guilds.cache.first();
+    if (!guild) return;
+
+    let financeRole = guild.roles.cache.find(r => 
+      r.name.toLowerCase().includes('finance manager') || r.name.toLowerCase().includes('finance')
+    );
+
+    if (!financeRole) {
+      console.log('🛠️ Creating "💳・FINANCE MANAGERS" role in server...');
+      financeRole = await guild.roles.create({
+        name: '💳・FINANCE MANAGERS',
+        color: 0x10B981, // Emerald Green for money/finance
+        hoist: true,     // Display separately in member list
+        mentionable: true,
+        reason: 'Auto-created role for payment and order receipt management'
+      });
+      console.log(`✅ Successfully created role: ${financeRole.name} (ID: ${financeRole.id})`);
+    }
+
+    if (!STAFF_ROLE_IDS.includes(financeRole.id)) {
+      STAFF_ROLE_IDS.push(financeRole.id);
+      console.log(`💳 Added ${financeRole.name} to active ticket staff roles!`);
+    }
+  } catch (err) {
+    console.error('Error ensuring finance role:', err.message);
+  }
+}
 
 // Setup Ticket Panel in #open-a-ticket
 async function setupTicketPanel() {
