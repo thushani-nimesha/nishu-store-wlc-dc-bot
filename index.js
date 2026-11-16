@@ -2549,19 +2549,20 @@ async function handleStoreButton(interaction) {
         .setDescription(
           `👋 Welcome ${user}! Thank you for choosing **NISHU STORE**.\n\n` +
           `🛍️ **Selected Product:** **${product ? product.name : 'Custom Order'}**\n` +
-          `💰 **Price (LKR):** **${product ? product.priceLKR : 'Special Price'}**\n` +
+          `💰 **Total Due:** **${product ? product.priceLKR : 'Special Price'}**\n` +
           `⏱️ **Estimated Delivery:** \`${product ? product.delivery : '5-15 Mins'}\`\n` +
           `🛡️ **Warranty:** \`${product ? product.warranty : 'Guaranteed'}\`\n\n` +
           '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
-          '**💳 ACCEPTED PAYMENT OPTIONS:**\n' +
-          '• **Bank Transfer:** Commercial Bank, Sampath, BOC, HNB\n' +
-          '• **Mobile Wallets:** FriMi / eZ Cash / Genie / Koko\n' +
-          '• **Crypto:** Binance Pay USDT / LTC / BTC\n' +
-          '• **Card / PayPal:** Available upon request\n\n' +
-          '📝 **Next Steps:**\n' +
-          '1. Inform our staff below how you would like to pay.\n' +
-          '2. Once payment details are sent, upload your payment receipt/screenshot here.\n' +
-          '3. Our staff will immediately verify and deliver your login credentials/key!'
+          '**🏦 OFFICIAL BANK PAYMENT DETAILS:**\n' +
+          '• **Bank:** `Bank of Ceylon (BOC)`\n' +
+          '• **Account Number:** `96293434`\n' +
+          '• **Account Name:** `E M M H S B EKANAYAKE`\n' +
+          '• **Branch:** `Peradeniya`\n\n' +
+          '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+          '**📝 HOW TO COMPLETE YOUR ORDER:**\n' +
+          '1. Transfer **' + (product ? product.priceLKR : 'the amount') + '** to the BOC account above (Online Banking / CDM / Bank Deposit).\n' +
+          '2. **Upload your payment receipt / slip screenshot** right here in this channel.\n' +
+          '3. Our **Finance Team** will verify and instantly send your product credentials/keys!'
         )
         .setFooter({ text: 'NISHU STORE • Fast & Reliable Digital Delivery' })
         .setTimestamp();
