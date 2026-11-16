@@ -3694,33 +3694,40 @@ async function handleMemberInviteLeave(member) {
 }
 
 async function handleInvitesCommand(interaction) {
-  await interaction.deferReply();
-  const targetUser = interaction.options.getUser('user') || interaction.user;
-  const allData = loadInvitesData();
-  const userData = allData[targetUser.id] || { regular: 0, left: 0, fake: 0, total: 0 };
+  try {
+    await interaction.deferReply({ flags: 64 });
+    const targetUser = (interaction.options && interaction.options.getUser) ? (interaction.options.getUser('user') || interaction.user) : interaction.user;
+    const allData = loadInvitesData();
+    const userData = allData[targetUser.id] || { regular: 0, left: 0, fake: 0, total: 0 };
 
-  const regular = userData.regular || 0;
-  const left = userData.left || 0;
-  const fake = userData.fake || 0;
-  const net = Math.max(0, regular - left);
+    const regular = userData.regular || 0;
+    const left = userData.left || 0;
+    const fake = userData.fake || 0;
+    const net = Math.max(0, regular - left);
 
-  const embed = new EmbedBuilder()
-    .setColor(0x5865F2)
-    .setTitle(`🔗 INVITE STATS // ${targetUser.username.toUpperCase()}`)
-    .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
-    .setDescription(
-      `Here is the verified server invite statistics for **${targetUser}**:\n\n` +
-      `✨ **Net Real Invites:** **${net}**\n\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `📥 **Joins (Regular):** \`${regular}\` members\n` +
-      `🚪 **Leaves (Left):** \`${left}\` members\n` +
-      `⚠️ **Fake / Self:** \`${fake}\` members\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
-    )
-    .setFooter({ text: 'NISHU STORE • Official Invite Tracker' })
-    .setTimestamp();
+    const embed = new EmbedBuilder()
+      .setColor(0x5865F2)
+      .setTitle(`🔗 INVITE STATS // ${targetUser.username.toUpperCase()}`)
+      .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
+      .setDescription(
+        `Here is the verified server invite statistics for **${targetUser}**:\n\n` +
+        `✨ **Net Real Invites:** **${net}**\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `📥 **Joins (Regular):** \`${regular}\` members\n` +
+        `🚪 **Leaves (Left):** \`${left}\` members\n` +
+        `⚠️ **Fake / Self:** \`${fake}\` members\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
+      )
+      .setFooter({ text: 'NISHU STORE • Official Invite Tracker' })
+      .setTimestamp();
 
-  return interaction.editReply({ embeds: [embed] });
+    return interaction.editReply({ embeds: [embed] });
+  } catch (err) {
+    console.error('Error in handleInvitesCommand:', err);
+    if (!interaction.replied) {
+      return interaction.editReply({ content: '❌ Error loading your stats.' }).catch(() => {});
+    }
+  }
 }
 
 async function handleInviteRankCommand(interaction) {
