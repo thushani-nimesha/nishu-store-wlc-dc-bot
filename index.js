@@ -2835,14 +2835,15 @@ function loadGiveaways() {
       fs.writeFileSync(GIVEAWAYS_FILE, '[]', 'utf8');
       return [];
     }
-    const data = fs.readFileSync(GIVEAWAYS_FILE, 'utf8').trim();
-    if (!data) {
+    let data = fs.readFileSync(GIVEAWAYS_FILE, 'utf8').trim();
+    // Remove any accidental wrapping quotes or BOM
+    data = data.replace(/^\uFEFF/, '').replace(/^['"]|['"]$/g, '').trim();
+    if (!data || !data.startsWith('[')) {
       fs.writeFileSync(GIVEAWAYS_FILE, '[]', 'utf8');
       return [];
     }
-    return JSON.parse(data) || [];
+    return JSON.parse(data);
   } catch (err) {
-    console.warn('Recovered corrupted giveaways.json, resetting to []:', err.message);
     try { fs.writeFileSync(GIVEAWAYS_FILE, '[]', 'utf8'); } catch (e) {}
     return [];
   }
