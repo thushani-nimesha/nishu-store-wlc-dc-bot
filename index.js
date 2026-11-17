@@ -1047,7 +1047,7 @@ client.on('interactionCreate', async (interaction) => {
       await handleDashboardButton(interaction);
     }
 
-    if (interaction.isChannelSelectMenu() && interaction.customId === 'panel_select_channels') {
+    if (interaction.isChannelSelectMenu() && (interaction.customId === 'panel_select_channels' || interaction.customId === 'panel_select_channels_photo')) {
       await handleDashboardChannelSelect(interaction);
     }
 
@@ -2267,6 +2267,7 @@ async function handleBroadcastCommand(interaction) {
 // --- 9. INTERACTIVE DASHBOARD (#bot-texts) ---
 // ==========================================
 const adminPendingSelections = new Map(); // userId -> { channelIds: [] }
+const adminPendingPhotoUpload = new Map(); // userId -> { channelIds: [], expires: timestamp }
 
 // Persistent Dashboard Setup in #bot-texts
 async function setupBotTextsPanel() {
@@ -2278,12 +2279,6 @@ async function setupBotTextsPanel() {
     if (!channel) return;
 
     const messages = await channel.messages.fetch({ limit: 10 });
-    const botMsg = messages.find(m => m.author.id === client.user.id && m.embeds.length > 0 && m.embeds[0].title?.includes('COMMAND & BROADCAST CONSOLE'));
-    if (botMsg) {
-      console.log('📌 Dashboard Panel already exists in #bot-texts.');
-      return;
-    }
-
     const dashboardEmbed = new EmbedBuilder()
       .setColor(0x5865F2)
       .setTitle('🎛️ NISHU BOT // COMMAND & BROADCAST CONSOLE')
@@ -2292,9 +2287,11 @@ async function setupBotTextsPanel() {
         'Send messages, media embeds, announcements, or mass DMs without typing any slash commands.\n\n' +
         '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
         '**⚡ ACTION CONTROLS:**\n\n' +
-        '📢 **1. Send Channel Message (Single or Multiple):**\n' +
-        '└ Select target channel(s) from dropdown, type your text, attach image/video/gif link or embed styling!\n\n' +
-        '📬 **2. Send Mass DM (Broadcast to All Members):**\n' +
+        '📢 **1. Send Channel Message (Text / Embed):**\n' +
+        '└ Select channel(s) and compose text or embeds via form.\n\n' +
+        '📸 **2. Send Picture / Media (Direct Copy-Paste / Upload):**\n' +
+        '└ Pick channel(s), then simply paste (Ctrl+V) or drag-and-drop pictures right here! No image URLs needed!\n\n' +
+        '📬 **3. Send Mass DM (Broadcast to All Members):**\n' +
         '└ Deliver direct announcements to all members\' inboxes safely with anti-spam protection.\n\n' +
         '🔒 *Restricted to Server Owner & Admins only.*'
       )
@@ -2303,16 +2300,25 @@ async function setupBotTextsPanel() {
     const btnRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('panel_btn_start_channel_msg')
-        .setLabel('📢 Send Channel Message')
+        .setLabel('📢 Send Text Message')
         .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId('panel_btn_start_photo_msg')
+        .setLabel('📸 Send Picture (Paste / Upload)')
+        .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
         .setCustomId('panel_btn_start_mass_dm')
         .setLabel('📬 Send Mass DM (Broadcast)')
         .setStyle(ButtonStyle.Primary)
     );
 
-    await channel.send({ embeds: [dashboardEmbed], components: [btnRow] });
-    console.log('✅ Posted Graphical Dashboard Panel in #bot-texts!');
+    if (botMsg) {
+      await botMsg.edit({ embeds: [dashboardEmbed], components: [btnRow] });
+      console.log('🔄 Updated Graphical Dashboard Panel in #bot-texts!');
+    } else {
+      await channel.send({ embeds: [dashboardEmbed], components: [btnRow] });
+      console.log('✅ Posted Graphical Dashboard Panel in #bot-texts!');
+    }
   } catch (err) {
     console.error('Error in setupBotTextsPanel:', err);
   }
@@ -2340,6 +2346,24 @@ async function handleDashboardButton(interaction) {
 
     return interaction.reply({
       content: '👇 **Step 1:** Select one or multiple channels below where you want to post your message:',
+      components: [row],
+      flags: 64
+    });
+  }
+
+  // Button: Send Picture / Upload Photo -> Prompt Channel Selector
+  if (interaction.customId === 'panel_btn_start_photo_msg') {
+    const channelSelect = new ChannelSelectMenuBuilder()
+      .setCustomId('panel_select_channels_photo')
+      .setPlaceholder('📸 Select target channel(s) where the picture should be posted...')
+      .setChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+      .setMinValues(1)
+      .setMaxValues(5);
+
+    const row = new ActionRowBuilder().addComponents(channelSelect);
+
+    return interaction.reply({
+      content: '👇 **Step 1:** Select the channel(s) where you want to publish your picture / photo:\n*(After selecting, you will simply drag-and-drop or Ctrl+V paste your picture!)*',
       components: [row],
       flags: 64
     });
@@ -2385,6 +2409,27 @@ async function handleDashboardButton(interaction) {
 // 2. Channel Dropdown Selection Handler
 async function handleDashboardChannelSelect(interaction) {
   const selectedChannels = interaction.values;
+
+  // Case A: Picture / Photo Upload Mode
+  if (interaction.customId === 'panel_select_channels_photo') {
+    adminPendingPhotoUpload.set(interaction.user.id, {
+      channelIds: selectedChannels,
+      expires: Date.now() + 180000 // 3 minutes timeout
+    });
+
+    const channelTags = selectedChannels.map(id => `<#${id}>`).join(', ');
+
+    return interaction.reply({
+      content: `📸 **Ready for your Picture!**\n\n` +
+        `Target Channel(s): ${channelTags}\n\n` +
+        `👉 **Now simply copy & paste (Ctrl+V) or drag-and-drop your image(s) right here in this channel!**\n` +
+        `*(Optional: You can type a caption / description along with the image)*\n\n` +
+        `⏱️ *Waiting for upload... (expires in 3 minutes)*`,
+      flags: 64
+    });
+  }
+
+  // Case B: Normal Text / Embed Modal
   adminPendingSelections.set(interaction.user.id, selectedChannels);
 
   // Show Message Compose Modal
@@ -3465,6 +3510,51 @@ client.on('messageCreate', async (message) => {
       if (isImage) {
         await handlePaymentSlipUpload(message);
         return; // Processed as payment slip, skip automod
+      }
+    }
+
+    // B. DETECT ADMIN PHOTO BROADCAST / UPLOAD FROM #bot-texts (OR ANY CHANNEL)
+    if (adminPendingPhotoUpload.has(message.author.id) && message.attachments.size > 0) {
+      const pending = adminPendingPhotoUpload.get(message.author.id);
+      if (Date.now() > pending.expires) {
+        adminPendingPhotoUpload.delete(message.author.id);
+      } else {
+        adminPendingPhotoUpload.delete(message.author.id);
+        const targetChannelIds = pending.channelIds;
+        const guild = message.guild;
+        const attachments = Array.from(message.attachments.values());
+        const caption = message.content ? message.content.trim() : '';
+
+        const sentChannels = [];
+        for (const chId of targetChannelIds) {
+          const ch = guild.channels.cache.get(chId);
+          if (!ch) continue;
+          try {
+            await ch.send({
+              content: caption || undefined,
+              files: attachments.map(att => att.url)
+            });
+            sentChannels.push(ch.toString());
+          } catch (err) {
+            console.error(`Failed to post picture to ${ch.name}:`, err);
+          }
+        }
+
+        // Delete user's raw upload message in #bot-texts to keep it clean if possible
+        if (message.channel.name.includes('bot-texts')) {
+          await message.delete().catch(() => {});
+        }
+
+        // Send confirmation in the current channel (auto-deleting after 10s)
+        const confirmMsg = await message.channel.send({
+          content: `✅ **Successfully published your picture to:** ${sentChannels.join(', ')}!`
+        }).catch(() => {});
+
+        if (confirmMsg && message.channel.name.includes('bot-texts')) {
+          setTimeout(() => confirmMsg.delete().catch(() => {}), 10000);
+        }
+
+        return; // Stop processing further for this message
       }
     }
 
