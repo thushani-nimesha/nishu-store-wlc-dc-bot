@@ -32,9 +32,11 @@ const {
   createAudioResource,
   AudioPlayerStatus,
   VoiceConnectionStatus,
-  entersState
+  entersState,
+  StreamType
 } = require('@discordjs/voice');
 const ytdl = require('@distube/ytdl-core');
+const play = require('play-dl');
 const ytSearch = require('yt-search');
 
 // --- 0. REGISTER MODERN SLEEK TYPOGRAPHY ---
@@ -4707,15 +4709,24 @@ class MusicQueue {
     this.isPaused = false;
 
     try {
-      const stream = ytdl(currentSong.url, {
-        filter: 'audioonly',
-        quality: 'highestaudio',
-        highWaterMark: 1 << 25
-      });
-
-      const resource = createAudioResource(stream, {
-        inlineVolume: true
-      });
+      let resource;
+      try {
+        const streamData = await play.stream(currentSong.url);
+        resource = createAudioResource(streamData.stream, {
+          inputType: streamData.type,
+          inlineVolume: true
+        });
+      } catch (playErr) {
+        console.warn('play-dl stream failed, attempting ytdl fallback:', playErr.message);
+        const ytdlStream = ytdl(currentSong.url, {
+          filter: 'audioonly',
+          quality: 'highestaudio',
+          highWaterMark: 1 << 25
+        });
+        resource = createAudioResource(ytdlStream, {
+          inlineVolume: true
+        });
+      }
 
       if (resource.volume) {
         resource.volume.setVolume(this.volume / 100);
