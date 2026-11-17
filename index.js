@@ -2288,12 +2288,14 @@ async function setupBotTextsPanel() {
         'Send messages, media embeds, announcements, or mass DMs without typing any slash commands.\n\n' +
         '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
         '**⚡ ACTION CONTROLS:**\n\n' +
-        '📢 **1. Send Channel Message (Text / Embed):**\n' +
-        '└ Select channel(s) and compose text or embeds via form.\n\n' +
-        '📸 **2. Send Picture / Media (Direct Copy-Paste / Upload):**\n' +
-        '└ Pick channel(s), then simply paste (Ctrl+V) or drag-and-drop pictures right here! No image URLs needed!\n\n' +
+        '📢 **1. Send Text Channel Message:**\n' +
+        '└ Select channel(s) and compose text or embed via form.\n\n' +
+        '📸 **2. Send Picture to Channel (Paste / Upload):**\n' +
+        '└ Select channel(s), then simply paste (Ctrl+V) or upload photos right here!\n\n' +
         '📬 **3. Send Mass DM (Broadcast to All Members):**\n' +
-        '└ Deliver direct announcements to all members\' inboxes safely with anti-spam protection.\n\n' +
+        '└ Type title and announcement to deliver into all member inboxes.\n\n' +
+        '🖼️ **4. Send Picture Mass DM (Paste / Upload):**\n' +
+        '└ Paste (Ctrl+V) or upload photo + caption to deliver directly into all member inboxes!\n\n' +
         '🔒 *Restricted to Server Owner & Admins only.*'
       )
       .setFooter({ text: 'NISHU STORE • Graphical Admin Console' });
@@ -2301,16 +2303,20 @@ async function setupBotTextsPanel() {
     const btnRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('panel_btn_start_channel_msg')
-        .setLabel('📢 Send Text Message')
+        .setLabel('📢 Channel Text')
         .setStyle(ButtonStyle.Success),
       new ButtonBuilder()
         .setCustomId('panel_btn_start_photo_msg')
-        .setLabel('📸 Send Picture (Paste / Upload)')
+        .setLabel('📸 Channel Picture')
         .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
         .setCustomId('panel_btn_start_mass_dm')
-        .setLabel('📬 Send Mass DM (Broadcast)')
-        .setStyle(ButtonStyle.Primary)
+        .setLabel('📬 Text Mass DM')
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId('panel_btn_start_photo_mass_dm')
+        .setLabel('🖼️ Picture Mass DM')
+        .setStyle(ButtonStyle.Secondary)
     );
 
     if (botMsg) {
@@ -2404,6 +2410,23 @@ async function handleDashboardButton(interaction) {
     );
 
     return interaction.showModal(modal);
+  }
+
+  // Button: Picture Mass DM (Direct Paste / Upload)
+  if (interaction.customId === 'panel_btn_start_photo_mass_dm') {
+    adminPendingPhotoUpload.set(interaction.user.id, {
+      isMassDM: true,
+      expires: Date.now() + 180000 // 3 minutes timeout
+    });
+
+    return interaction.reply({
+      content: '🖼️ **Ready for Mass DM Picture Broadcast!**\n\n' +
+        '👉 **Copy & paste (Ctrl+V) or upload your image right here in this channel!**\n' +
+        '*(Tip: Add your announcement text/caption to the picture before sending)*\n\n' +
+        '🚀 Once uploaded, the bot will deliver it directly to **all member inboxes**!\n' +
+        '⏱️ *Waiting for upload... (expires in 3 minutes)*',
+      flags: 64
+    });
   }
 }
 
@@ -3521,11 +3544,86 @@ client.on('messageCreate', async (message) => {
         adminPendingPhotoUpload.delete(message.author.id);
       } else {
         adminPendingPhotoUpload.delete(message.author.id);
-        const targetChannelIds = pending.channelIds;
         const guild = message.guild;
         const attachments = Array.from(message.attachments.values());
         const caption = message.content ? message.content.trim() : '';
 
+        // Case 1: PICTURE MASS DM TO ALL MEMBERS
+        if (pending.isMassDM) {
+          const statusMsg = await message.channel.send({
+            content: '⏳ **Fetching member list for Picture Mass DM...**'
+          }).catch(() => {});
+
+          let members;
+          try {
+            members = await guild.members.fetch();
+          } catch (err) {
+            if (statusMsg) await statusMsg.edit({ content: '❌ Failed to fetch members: ' + err.message }).catch(() => {});
+            return;
+          }
+
+          const humanMembers = members.filter(m => !m.user.bot);
+          const total = humanMembers.size;
+
+          if (statusMsg) {
+            await statusMsg.edit({
+              content: `🚀 Starting Picture Mass DM to **${total} members**.\n` +
+                `⚡ *Using safe delay (1.2s per user) to protect bot from Discord limits.*\n` +
+                `Estimated completion: **~${Math.ceil((total * 1.2) / 60)} minutes**.`
+            }).catch(() => {});
+          }
+
+          const fileUrls = attachments.map(att => att.url);
+
+          (async () => {
+            let sent = 0;
+            let failed = 0;
+
+            for (const [, member] of humanMembers) {
+              try {
+                await member.send({
+                  content: caption || undefined,
+                  files: fileUrls
+                });
+                sent++;
+              } catch (err) {
+                failed++;
+              }
+              await new Promise(r => setTimeout(r, 1200));
+            }
+
+            console.log(`📢 Picture Mass DM complete: ${sent} delivered, ${failed} failed.`);
+            if (statusMsg) {
+              await statusMsg.edit({
+                content: `✅ **Picture Mass DM Broadcast Finished!**\n📨 Delivered: **${sent}**\n🚫 Closed DMs: **${failed}**`
+              }).catch(() => {});
+            }
+
+            const logChannel = client.channels.cache.get(TICKET_LOG_CHANNEL_ID);
+            if (logChannel) {
+              const report = new EmbedBuilder()
+                .setColor(0x57F287)
+                .setTitle('📬 Picture Mass DM Broadcast Completed')
+                .addFields(
+                  { name: '👤 Admin', value: message.author.tag, inline: true },
+                  { name: '📨 Delivered', value: `${sent}`, inline: true },
+                  { name: '🚫 Closed DMs', value: `${failed}`, inline: true },
+                  { name: '📝 Caption', value: caption || '*(No Caption)*', inline: false }
+                )
+                .setTimestamp();
+              await logChannel.send({ embeds: [report] }).catch(() => {});
+            }
+          })();
+
+          // Clean admin upload message in bot-texts
+          if (message.channel.name.includes('bot-texts')) {
+            await message.delete().catch(() => {});
+          }
+          return;
+        }
+
+        // Case 2: POST PICTURE TO SPECIFIC CHANNELS
+        const targetChannelIds = pending.channelIds || [];
         const sentChannels = [];
         for (const chId of targetChannelIds) {
           const ch = guild.channels.cache.get(chId);
