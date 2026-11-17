@@ -4076,8 +4076,8 @@ async function handleGetMyInviteLink(interaction) {
       userInvite = await channel.createInvite({
         maxAge: 0, // Never expire
         maxUses: 0, // Unlimited uses
-        unique: false, // Re-use standard invite code if possible
-        reason: `Permanent Invite Link for ${interaction.user.tag}`
+        unique: true, // MUST be true so every user gets their own unique invite code!
+        reason: `Permanent Invite Link for ${interaction.user.tag} (${interaction.user.id})`
       });
 
       // Update in-memory tracking cache
