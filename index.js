@@ -4660,11 +4660,18 @@ class MusicQueue {
     this.volume = 100;
 
     this.player.on(AudioPlayerStatus.Idle, () => {
+      // Remove finished song from queue
+      if (this.songs.length > 0) {
+        this.songs.shift();
+      }
       this.playNext();
     });
 
     this.player.on('error', error => {
       console.error('Audio Player Error:', error.message);
+      if (this.songs.length > 0) {
+        this.songs.shift();
+      }
       this.playNext();
     });
   }
