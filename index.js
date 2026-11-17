@@ -2279,6 +2279,7 @@ async function setupBotTextsPanel() {
     if (!channel) return;
 
     const messages = await channel.messages.fetch({ limit: 10 });
+    const botMsg = messages.find(m => m.author.id === client.user.id && m.embeds.length > 0 && m.embeds[0].title?.includes('COMMAND & BROADCAST CONSOLE'));
     const dashboardEmbed = new EmbedBuilder()
       .setColor(0x5865F2)
       .setTitle('🎛️ NISHU BOT // COMMAND & BROADCAST CONSOLE')
