@@ -184,6 +184,98 @@ app.post('/api/server/send', authenticateApi, async (req, res) => {
   }
 });
 
+// 5. Branded VIP Cinema Web Player
+app.get('/cinema/player', (req, res) => {
+  const imdbId = req.query.id || 'tt2250912';
+  const title = req.query.title || 'VIP Movie Experience';
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🍿 ${title} | NISHU STORE VIP CINEMA</title>
+  <link rel="icon" href="https://cdn.discordapp.com/emojis/123456789.png">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: #0b0d14; color: #fff; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    header {
+      background: linear-gradient(90deg, #181926 0%, #1e1e2e 100%);
+      border-bottom: 2px solid #5865f2;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+      z-index: 10;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-logo { font-size: 26px; }
+    .brand-title { font-size: 18px; font-weight: 700; background: linear-gradient(45deg, #a855f7, #6366f1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 1px; }
+    .movie-badge { background: rgba(99, 102, 241, 0.2); border: 1px solid #6366f1; border-radius: 6px; padding: 4px 12px; font-size: 13px; color: #c7d2fe; font-weight: 600; }
+    .status-badge { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #10b981; }
+    .status-dot { width: 8px; height: 8px; background: #10b981; border-radius: 50%; box-shadow: 0 0 10px #10b981; }
+    
+    .screen-container {
+      flex: 1;
+      position: relative;
+      background: #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+    footer {
+      background: #11111b;
+      padding: 10px 24px;
+      font-size: 12px;
+      color: #9399b2;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid #232534;
+    }
+    .tip { color: #f59e0b; font-weight: 500; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="brand-logo">👑</span>
+      <div>
+        <div class="brand-title">NISHU STORE • VIP CINEMA</div>
+      </div>
+      <div class="movie-badge">🎬 ${title}</div>
+    </div>
+    <div class="status-badge">
+      <div class="status-dot"></div>
+      <span>VIP HD STREAM READY</span>
+    </div>
+  </header>
+
+  <div class="screen-container">
+    <iframe 
+      src="https://vidsrc.to/embed/movie/${imdbId}" 
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+      allowfullscreen>
+    </iframe>
+  </div>
+
+  <footer>
+    <div class="tip">💡 How to stream to Discord: Click 'Share Screen 🖥️' in your Voice Room and choose this window with Audio!</div>
+    <div>Protected by <strong>NISHU STORE DIGITAL</strong></div>
+  </footer>
+</body>
+</html>`;
+
+  res.send(html);
+});
+
+
 app.listen(PORT, () => {
   console.log(`🌐 Web server & Admin Bridge listening on port ${PORT} (Keep-alive ready)`);
 });
@@ -2188,25 +2280,27 @@ async function handleCinemaButton(interaction) {
         console.warn('Activity invite fallback:', actErr.message);
       }
 
+      const webPlayerUrl = `http://209.50.54.199:3000/cinema/player?id=${imdbID}&title=${encodeURIComponent(shortTitle)}`;
+
       const roomCreatedEmbed = new EmbedBuilder()
         .setColor(0x57F287)
         .setTitle('🍿 PRIVATE CINEMA ROOM CREATED!')
         .setDescription(
           `🎉 Your Private Watch Party Room is ready: ${cinemaRoom}!\n\n` +
-          '**📺 How to Watch Inside Discord:**\n' +
+          '**📺 How to Watch (Nishu VIP Cinema):**\n' +
           '1️⃣ **Join Your Room:** Click ' + cinemaRoom.toString() + ' to enter the voice channel.\n' +
-          '2️⃣ **Launch Cinema Screen:** Click the green **"🚀 Launch Watch Party Screen"** button below!\n' +
-          '3️⃣ Discord will open the synchronized cinema screen directly inside your voice room.\n' +
-          '4️⃣ You can invite your friends to this room to watch together in real-time!\n\n' +
+          '2️⃣ **Launch Cinema Screen:** Click **"🍿 Open Nishu VIP Theater"** below!\n' +
+          '3️⃣ **Screen Share:** Click **Share Screen 🖥️** inside your voice room and choose the Theater tab with audio!\n' +
+          '4️⃣ All your friends in the room can watch together in 1080p Full HD!\n\n' +
           '🧹 *This room will automatically delete when everyone leaves.*'
         )
-        .setFooter({ text: 'NISHU VIP Cinema • Pure Discord In-App Experience' });
+        .setFooter({ text: 'NISHU VIP Cinema • Exclusive In-House Experience' });
 
       const buttonRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-          .setLabel('🚀 Launch Watch Party Screen')
+          .setLabel('🍿 Open Nishu VIP Theater')
           .setStyle(ButtonStyle.Link)
-          .setURL(activityUrl || `https://discord.com/channels/${guild.id}/${cinemaRoom.id}`)
+          .setURL(webPlayerUrl)
       );
 
       return interaction.editReply({ embeds: [roomCreatedEmbed], components: [buttonRow] });
