@@ -4741,7 +4741,7 @@ class MusicQueue {
               '-i', directAudioUrl,
               '-analyzeduration', '0',
               '-loglevel', '0',
-              '-f', 'opus',
+              '-f', 's16le',
               '-ar', '48000',
               '-ac', '2',
               'pipe:1'
@@ -4750,7 +4750,7 @@ class MusicQueue {
             ffmpegProcess.on('error', err => console.warn('ffmpeg spawn error:', err.message));
 
             resource = createAudioResource(ffmpegProcess.stdout, {
-              inputType: StreamType.OggOpus,
+              inputType: StreamType.Raw,
               inlineVolume: true
             });
           }
