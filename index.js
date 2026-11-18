@@ -201,230 +201,214 @@ app.get('/cinema/player', (req, res) => {
   <title>👑 ${title} • NISHU VIP THEATER</title>
   <link rel="icon" href="https://cdn.discordapp.com/emojis/1054395029377482813.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-user-select: none; user-select: none; }
-    body {
-      background: radial-gradient(circle at 50% 10%, #15102a 0%, #07070d 100%);
+    
+    html, body {
+      background: #06060c;
       color: #fff;
-      font-family: 'Outfit', sans-serif;
+      font-family: 'Plus Jakarta Sans', sans-serif;
       height: 100vh;
+      width: 100vw;
+      overflow: hidden;
       display: flex;
       flex-direction: column;
-      overflow: hidden;
     }
 
-    /* TOP HEADER */
+    /* TOP LUXURY COMPACT BAR */
     header {
-      background: rgba(13, 14, 24, 0.85);
+      height: 48px;
+      padding: 0 20px;
+      background: rgba(11, 11, 20, 0.95);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
-      border-bottom: 1px solid rgba(147, 51, 234, 0.3);
-      padding: 12px 28px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.8);
       z-index: 100;
     }
 
-    .brand-wrap {
+    .brand-group {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 10px;
     }
 
-    .logo-badge {
-      width: 44px;
-      height: 44px;
-      border-radius: 12px;
-      background: linear-gradient(135deg, #a855f7 0%, #6366f1 100%);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 24px;
-      box-shadow: 0 0 20px rgba(168, 85, 247, 0.5);
-      border: 1px solid rgba(255, 255, 255, 0.2);
+    .crown-icon {
+      font-size: 16px;
+      filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.5));
     }
 
-    .brand-text h1 {
-      font-size: 19px;
-      font-weight: 900;
-      letter-spacing: 1.5px;
-      background: linear-gradient(90deg, #c084fc, #818cf8, #38bdf8);
+    .brand-title {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      background: linear-gradient(135deg, #ffffff 40%, #c084fc 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       text-transform: uppercase;
     }
 
-    .brand-text p {
-      font-size: 11px;
-      color: #94a3b8;
-      letter-spacing: 1px;
-      font-family: 'JetBrains Mono', monospace;
+    .brand-tag {
+      font-size: 9px;
+      font-weight: 700;
+      color: #a855f7;
+      background: rgba(168, 85, 247, 0.12);
+      border: 1px solid rgba(168, 85, 247, 0.25);
+      padding: 2px 7px;
+      border-radius: 5px;
+      letter-spacing: 0.5px;
     }
 
-    .movie-info-pill {
+    /* CENTER TITLE */
+    .movie-pill {
       display: flex;
       align-items: center;
-      gap: 10px;
-      background: rgba(30, 27, 75, 0.6);
-      border: 1px solid rgba(139, 92, 246, 0.4);
-      padding: 6px 16px;
-      border-radius: 30px;
-      box-shadow: 0 0 15px rgba(139, 92, 246, 0.2);
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #94a3b8;
+      max-width: 360px;
     }
-
-    .movie-title {
-      font-weight: 700;
-      font-size: 14px;
+    .movie-pill-title {
       color: #e2e8f0;
-      max-width: 320px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
-    .status-area {
+    /* RIGHT ACTIONS */
+    .right-group {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 12px;
     }
 
-    .server-switch-btn {
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      color: #cbd5e1;
-      padding: 6px 14px;
-      border-radius: 8px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      font-family: 'Outfit', sans-serif;
-    }
-    .server-switch-btn:hover {
-      background: rgba(168, 85, 247, 0.3);
-      border-color: #a855f7;
-      color: #fff;
-    }
-
-    .live-pill {
+    .vip-live {
       display: flex;
       align-items: center;
-      gap: 8px;
-      background: rgba(16, 185, 129, 0.15);
-      border: 1px solid rgba(16, 185, 129, 0.4);
-      padding: 6px 14px;
+      gap: 6px;
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      padding: 3px 10px;
       border-radius: 20px;
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 700;
       color: #34d399;
-      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.5px;
     }
 
     .live-dot {
-      width: 8px;
-      height: 8px;
+      width: 5px;
+      height: 5px;
       background: #10b981;
       border-radius: 50%;
-      box-shadow: 0 0 12px #10b981;
+      box-shadow: 0 0 8px #10b981;
       animation: pulse 1.8s infinite;
     }
 
     @keyframes pulse {
-      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-      70% { transform: scale(1.1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
-      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+      0% { transform: scale(0.9); opacity: 0.6; }
+      50% { transform: scale(1.3); opacity: 1; }
+      100% { transform: scale(0.9); opacity: 0.6; }
     }
 
-    /* SCREEN AREA */
-    .cinema-viewport {
+    .fullscreen-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #cbd5e1;
+      padding: 4px 11px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+    .fullscreen-btn:hover {
+      background: rgba(168, 85, 247, 0.2);
+      border-color: #a855f7;
+      color: #fff;
+    }
+
+    /* CINEMA WRAPPER */
+    #cinema-container {
       flex: 1;
       position: relative;
       background: #000;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+      width: 100%;
+      height: 100%;
     }
 
     #cinema-frame {
       width: 100%;
       height: 100%;
       border: none;
-      background: #000;
+      display: block;
     }
 
     /* FOOTER */
     footer {
-      background: rgba(10, 10, 18, 0.95);
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
-      padding: 10px 28px;
+      height: 28px;
+      padding: 0 20px;
+      background: #050508;
+      border-top: 1px solid rgba(255, 255, 255, 0.04);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      font-size: 12px;
-      color: #64748b;
+      font-size: 10px;
+      color: #475569;
       z-index: 100;
     }
-
-    .stream-guide {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      color: #facc15;
-      font-weight: 600;
-    }
-
-    .brand-protect {
-      font-family: 'JetBrains Mono', monospace;
-      color: #94a3b8;
-    }
-    .brand-protect strong {
-      color: #c084fc;
-    }
+    .stream-tip { color: #ca8a04; font-weight: 500; }
+    .brand-protect { font-weight: 600; color: #64748b; letter-spacing: 0.5px; }
   </style>
 </head>
 <body oncontextmenu="return false;">
-  <header>
-    <div class="brand-wrap">
-      <div class="logo-badge">👑</div>
-      <div class="brand-text">
-        <h1>NISHU STORE</h1>
-        <p>VIP PRIVATE THEATER HUB</p>
-      </div>
+  <header id="top-header">
+    <div class="brand-group">
+      <span class="crown-icon">👑</span>
+      <span class="brand-title">NISHU STORE</span>
+      <span class="brand-tag">VIP THEATER</span>
     </div>
 
-    <div class="movie-info-pill">
+    <div class="movie-pill">
       <span>🎬</span>
-      <span class="movie-title">${title}</span>
+      <span class="movie-pill-title">${title}</span>
     </div>
 
-    <div class="status-area">
-      <div class="live-pill">
+    <div class="right-group">
+      <div class="vip-live">
         <div class="live-dot"></div>
-        <span>VIP HD ACTIVE</span>
+        <span>1080P HD STREAM</span>
       </div>
+      <button class="fullscreen-btn" onclick="toggleCinemaFullscreen()">
+        <span id="fs-icon">⛶</span> Fullscreen
+      </button>
     </div>
   </header>
 
-  <div class="cinema-viewport">
+  <div id="cinema-container">
     <iframe 
       id="cinema-frame" 
       src="" 
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
       allowfullscreen>
     </iframe>
   </div>
 
   <footer>
-    <div class="stream-guide">
-      <span>💡 Pro Tip:</span>
-      <span>In your Discord Voice Channel, click <strong>"Share Screen 🖥️"</strong> and select this tab with audio!</span>
-    </div>
-    <div class="brand-protect">
-      PROTECTED BY <strong>NISHU VIP CIPHER</strong> • ENCRYPTED STREAM
-    </div>
+    <div class="stream-tip">💡 Discord Stream: In voice room, click "Share Screen 🖥️" and select this tab with audio!</div>
+    <div class="brand-protect">NISHU EXCLUSIVE • ENCRYPTED CIPHER</div>
   </footer>
 
   <script>
@@ -433,10 +417,31 @@ app.get('/cinema/player', (req, res) => {
     const frame = document.getElementById('cinema-frame');
     frame.src = _s1;
 
-    // ANTI-HACK / ANTI-DEVTOOLS SHIELD
+    // CUSTOM FULLSCREEN CONTROLLER:
+    // Fullscreen on our container ensures the browser notification NEVER shows third-party domains!
+    function toggleCinemaFullscreen() {
+      const container = document.getElementById('cinema-container');
+      const fsIcon = document.getElementById('fs-icon');
+      if (!document.fullscreenElement) {
+        if (container.requestFullscreen) {
+          container.requestFullscreen();
+        } else if (container.webkitRequestFullscreen) {
+          container.webkitRequestFullscreen();
+        } else if (container.msRequestFullscreen) {
+          container.msRequestFullscreen();
+        }
+        fsIcon.innerText = "✕";
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+        fsIcon.innerText = "⛶";
+      }
+    }
+
+    // ANTI-HACK & DEVTOOLS LOCK
     document.addEventListener('contextmenu', e => e.preventDefault());
     document.addEventListener('keydown', e => {
-      // Block F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U, Ctrl+S
       if (
         e.keyCode === 123 || 
         (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) ||
@@ -446,18 +451,6 @@ app.get('/cinema/player', (req, res) => {
         return false;
       }
     });
-
-    // Detect DevTools console opening
-    let devtoolsOpen = false;
-    const threshold = 160;
-    setInterval(() => {
-      if (window.outerWidth - window.innerWidth > threshold || window.outerHeight - window.innerHeight > threshold) {
-        if (!devtoolsOpen) {
-          devtoolsOpen = true;
-          document.body.innerHTML = '<div style="background:#000;color:#f43f5e;display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;font-size:24px;font-weight:bold;">⚠️ Unauthorized Developer Inspection Blocked By Nishu Shield.</div>';
-        }
-      }
-    }, 1000);
   </script>
 </body>
 </html>`;
