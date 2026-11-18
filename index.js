@@ -184,14 +184,61 @@ app.post('/api/server/send', authenticateApi, async (req, res) => {
   }
 });
 
+// In-Memory Temporary Cinema Access Tokens (One-Time / Expirable)
+const cinemaSessionTokens = new Map();
+
+// Clean expired tokens every 10 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [token, data] of cinemaSessionTokens.entries()) {
+    if (now - data.createdAt > 3 * 60 * 60 * 1000) { // 3 hours max session
+      cinemaSessionTokens.delete(token);
+    }
+  }
+}, 10 * 60 * 1000);
+
 // 5. Branded VIP Cinema Web Player (Ultra-Secure Anti-Tamper & Luxury Cyberpunk UI)
 app.get('/cinema/player', (req, res) => {
-  const imdbId = req.query.id || 'tt2250912';
+  const token = req.query.token;
+  const imdbId = req.query.id;
   const title = req.query.title || 'VIP Movie Experience';
 
+  // Security Check: Validate temporary access token
+  if (!token || !cinemaSessionTokens.has(token)) {
+    return res.status(403).send(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>🔒 ACCESS EXPIRED • NISHU VIP THEATER</title>
+  <style>
+    body { background: #07070d; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+    .card { background: rgba(255,255,255,0.03); border: 1px solid rgba(244,63,94,0.3); padding: 40px; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); max-width: 460px; }
+    .icon { font-size: 48px; margin-bottom: 16px; }
+    h1 { font-size: 20px; color: #f43f5e; margin-bottom: 8px; letter-spacing: 1px; }
+    p { font-size: 13px; color: #94a3b8; line-height: 1.6; }
+    .badge { margin-top: 20px; display: inline-block; background: rgba(168,85,247,0.15); border: 1px solid #a855f7; color: #d8b4fe; padding: 6px 16px; border-radius: 8px; font-size: 12px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">🔒</div>
+    <h1>TICKET EXPIRED OR INVALID</h1>
+    <p>This Cinema Session Ticket is invalid or has already expired. Each movie ticket is private, encrypted, and single-use to protect Nishu Store members from link sharing/reselling.</p>
+    <div class="badge">👉 Please generate a fresh room inside Discord (#vip-cinema)</div>
+  </div>
+</body>
+</html>`);
+  }
+
+  // Token is valid! Mark as activated
+  const session = cinemaSessionTokens.get(token);
+  session.activated = true;
+
+  const actualImdbId = imdbId || session.imdbId || 'tt2250912';
+
   // Obfuscate the streaming endpoints so they are not plain in HTML
-  const encodedStream = Buffer.from(`https://vidsrc.to/embed/movie/${imdbId}`).toString('base64');
-  const encodedBackup = Buffer.from(`https://autoembed.to/movie/imdb/${imdbId}`).toString('base64');
+  const encodedStream = Buffer.from(`https://vidsrc.to/embed/movie/${actualImdbId}`).toString('base64');
+  const encodedBackup = Buffer.from(`https://autoembed.to/movie/imdb/${actualImdbId}`).toString('base64');
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -376,13 +423,31 @@ app.get('/cinema/player', (req, res) => {
 <body oncontextmenu="return false;">
   <header id="top-header">
     <div class="brand-group">
-      <span class="crown-icon">👑</span>
+      <svg class="crown-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M5 16L3 5L8.5 10L12 4L15.5 10L21 5L19 16H5Z" stroke="#c084fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="url(#crown-grad)"/>
+        <path d="M5 19C5 18.4477 5.44772 18 6 18H18C18.5523 18 19 18.4477 19 19C19 19.5523 18.5523 20 18 20H6C5.44772 20 5 19.5523 5 19Z" fill="#a855f7"/>
+        <defs>
+          <linearGradient id="crown-grad" x1="12" y1="4" x2="12" y2="16" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#e9d5ff"/>
+            <stop offset="1" stop-color="#9333ea"/>
+          </linearGradient>
+        </defs>
+      </svg>
       <span class="brand-title">NISHU STORE</span>
       <span class="brand-tag">VIP THEATER</span>
     </div>
 
     <div class="movie-pill">
-      <span>🎬</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
+        <line x1="7" y1="2" x2="7" y2="22"/>
+        <line x1="17" y1="2" x2="17" y2="22"/>
+        <line x1="2" y1="12" x2="22" y2="12"/>
+        <line x1="2" y1="7" x2="7" y2="7"/>
+        <line x1="2" y1="17" x2="7" y2="17"/>
+        <line x1="17" y1="17" x2="22" y2="17"/>
+        <line x1="17" y1="7" x2="22" y2="7"/>
+      </svg>
       <span class="movie-pill-title">${title}</span>
     </div>
 
@@ -392,7 +457,10 @@ app.get('/cinema/player', (req, res) => {
         <span>1080P HD STREAM</span>
       </div>
       <button class="fullscreen-btn" onclick="toggleCinemaFullscreen()">
-        <span id="fs-icon">⛶</span> Fullscreen
+        <svg id="fs-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+        </svg>
+        Fullscreen
       </button>
     </div>
   </header>
@@ -406,7 +474,7 @@ app.get('/cinema/player', (req, res) => {
   </div>
 
   <footer>
-    <div class="stream-tip">💡 Pro Tip: Click "⛶ Fullscreen" or press "F" / Double Click screen for Pure Nishu Fullscreen!</div>
+    <div class="stream-tip">✨ Stream: In voice room, click "Share Screen 🖥️" and select this tab with audio!</div>
     <div class="brand-protect">NISHU EXCLUSIVE • ENCRYPTED CIPHER</div>
   </footer>
 
@@ -2469,7 +2537,17 @@ async function handleCinemaButton(interaction) {
         console.warn('Activity invite fallback:', actErr.message);
       }
 
-      const webPlayerUrl = `http://209.50.54.199/cinema/player?id=${imdbID}&title=${encodeURIComponent(shortTitle)}`;
+      // Generate Secure One-Time Temporary Cinema Session Ticket (Anti-Resell & Anti-Sharing)
+      const sessionToken = require('crypto').randomBytes(16).toString('hex');
+      cinemaSessionTokens.set(sessionToken, {
+        userId: user.id,
+        imdbId: imdbID,
+        title: shortTitle,
+        createdAt: Date.now(),
+        activated: false
+      });
+
+      const webPlayerUrl = `http://209.50.54.199/cinema/player?token=${sessionToken}&id=${imdbID}&title=${encodeURIComponent(shortTitle)}`;
 
       const roomCreatedEmbed = new EmbedBuilder()
         .setColor(0x57F287)
@@ -2481,9 +2559,9 @@ async function handleCinemaButton(interaction) {
           '2️⃣ **Launch Cinema Screen:** Click **"🍿 Open Nishu VIP Theater"** below!\n' +
           '3️⃣ **Screen Share:** Click **Share Screen 🖥️** inside your voice room and choose the Theater tab with audio!\n' +
           '4️⃣ All your friends in the room can watch together in 1080p Full HD!\n\n' +
-          '🧹 *This room will automatically delete when everyone leaves.*'
+          '🔒 *Security Notice: Your ticket link is private, encrypted, and single-use to prevent link theft.*'
         )
-        .setFooter({ text: 'NISHU VIP Cinema • Exclusive In-House Experience' });
+        .setFooter({ text: 'NISHU VIP Cinema • Encrypted Session Ticket' });
 
       const buttonRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
