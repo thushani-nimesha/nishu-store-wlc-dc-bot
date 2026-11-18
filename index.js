@@ -184,39 +184,162 @@ app.post('/api/server/send', authenticateApi, async (req, res) => {
   }
 });
 
-// 5. Branded VIP Cinema Web Player
+// 5. Branded VIP Cinema Web Player (Ultra-Secure Anti-Tamper & Luxury Cyberpunk UI)
 app.get('/cinema/player', (req, res) => {
   const imdbId = req.query.id || 'tt2250912';
   const title = req.query.title || 'VIP Movie Experience';
+
+  // Obfuscate the streaming endpoints so they are not plain in HTML
+  const encodedStream = Buffer.from(`https://vidsrc.to/embed/movie/${imdbId}`).toString('base64');
+  const encodedBackup = Buffer.from(`https://autoembed.to/movie/imdb/${imdbId}`).toString('base64');
 
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🍿 ${title} | NISHU STORE VIP CINEMA</title>
-  <link rel="icon" href="https://cdn.discordapp.com/emojis/123456789.png">
+  <title>👑 ${title} • NISHU VIP THEATER</title>
+  <link rel="icon" href="https://cdn.discordapp.com/emojis/1054395029377482813.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-    body { background-color: #0b0d14; color: #fff; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-user-select: none; user-select: none; }
+    body {
+      background: radial-gradient(circle at 50% 10%, #15102a 0%, #07070d 100%);
+      color: #fff;
+      font-family: 'Outfit', sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* TOP HEADER */
     header {
-      background: linear-gradient(90deg, #181926 0%, #1e1e2e 100%);
-      border-bottom: 2px solid #5865f2;
-      padding: 12px 24px;
+      background: rgba(13, 14, 24, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(147, 51, 234, 0.3);
+      padding: 12px 28px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
-      z-index: 10;
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.8);
+      z-index: 100;
     }
-    .brand { display: flex; align-items: center; gap: 12px; }
-    .brand-logo { font-size: 26px; }
-    .brand-title { font-size: 18px; font-weight: 700; background: linear-gradient(45deg, #a855f7, #6366f1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 1px; }
-    .movie-badge { background: rgba(99, 102, 241, 0.2); border: 1px solid #6366f1; border-radius: 6px; padding: 4px 12px; font-size: 13px; color: #c7d2fe; font-weight: 600; }
-    .status-badge { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #10b981; }
-    .status-dot { width: 8px; height: 8px; background: #10b981; border-radius: 50%; box-shadow: 0 0 10px #10b981; }
-    
-    .screen-container {
+
+    .brand-wrap {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .logo-badge {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #a855f7 0%, #6366f1 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      box-shadow: 0 0 20px rgba(168, 85, 247, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .brand-text h1 {
+      font-size: 19px;
+      font-weight: 900;
+      letter-spacing: 1.5px;
+      background: linear-gradient(90deg, #c084fc, #818cf8, #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-transform: uppercase;
+    }
+
+    .brand-text p {
+      font-size: 11px;
+      color: #94a3b8;
+      letter-spacing: 1px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .movie-info-pill {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(30, 27, 75, 0.6);
+      border: 1px solid rgba(139, 92, 246, 0.4);
+      padding: 6px 16px;
+      border-radius: 30px;
+      box-shadow: 0 0 15px rgba(139, 92, 246, 0.2);
+    }
+
+    .movie-title {
+      font-weight: 700;
+      font-size: 14px;
+      color: #e2e8f0;
+      max-width: 320px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .status-area {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .server-switch-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #cbd5e1;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: 'Outfit', sans-serif;
+    }
+    .server-switch-btn:hover {
+      background: rgba(168, 85, 247, 0.3);
+      border-color: #a855f7;
+      color: #fff;
+    }
+
+    .live-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #34d399;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      background: #10b981;
+      border-radius: 50%;
+      box-shadow: 0 0 12px #10b981;
+      animation: pulse 1.8s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      70% { transform: scale(1.1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    /* SCREEN AREA */
+    .cinema-viewport {
       flex: 1;
       position: relative;
       background: #000;
@@ -224,51 +347,135 @@ app.get('/cinema/player', (req, res) => {
       justify-content: center;
       align-items: center;
     }
-    iframe {
+
+    #cinema-frame {
       width: 100%;
       height: 100%;
       border: none;
+      background: #000;
     }
+
+    /* FOOTER */
     footer {
-      background: #11111b;
-      padding: 10px 24px;
-      font-size: 12px;
-      color: #9399b2;
+      background: rgba(10, 10, 18, 0.95);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 10px 28px;
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      border-top: 1px solid #232534;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #64748b;
+      z-index: 100;
     }
-    .tip { color: #f59e0b; font-weight: 500; }
+
+    .stream-guide {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #facc15;
+      font-weight: 600;
+    }
+
+    .brand-protect {
+      font-family: 'JetBrains Mono', monospace;
+      color: #94a3b8;
+    }
+    .brand-protect strong {
+      color: #c084fc;
+    }
   </style>
 </head>
-<body>
+<body oncontextmenu="return false;">
   <header>
-    <div class="brand">
-      <span class="brand-logo">👑</span>
-      <div>
-        <div class="brand-title">NISHU STORE • VIP CINEMA</div>
+    <div class="brand-wrap">
+      <div class="logo-badge">👑</div>
+      <div class="brand-text">
+        <h1>NISHU STORE</h1>
+        <p>VIP PRIVATE THEATER HUB</p>
       </div>
-      <div class="movie-badge">🎬 ${title}</div>
     </div>
-    <div class="status-badge">
-      <div class="status-dot"></div>
-      <span>VIP HD STREAM READY</span>
+
+    <div class="movie-info-pill">
+      <span>🎬</span>
+      <span class="movie-title">${title}</span>
+    </div>
+
+    <div class="status-area">
+      <button class="server-switch-btn" id="switchSourceBtn" onclick="switchStream()">🔄 Switch Source (Backup)</button>
+      <div class="live-pill">
+        <div class="live-dot"></div>
+        <span>VIP HD ACTIVE</span>
+      </div>
     </div>
   </header>
 
-  <div class="screen-container">
+  <div class="cinema-viewport">
     <iframe 
-      src="https://vidsrc.to/embed/movie/${imdbId}" 
+      id="cinema-frame" 
+      src="" 
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
       allowfullscreen>
     </iframe>
   </div>
 
   <footer>
-    <div class="tip">💡 How to stream to Discord: Click 'Share Screen 🖥️' in your Voice Room and choose this window with Audio!</div>
-    <div>Protected by <strong>NISHU STORE DIGITAL</strong></div>
+    <div class="stream-guide">
+      <span>💡 Pro Tip:</span>
+      <span>In your Discord Voice Channel, click <strong>"Share Screen 🖥️"</strong> and select this tab with audio!</span>
+    </div>
+    <div class="brand-protect">
+      PROTECTED BY <strong>NISHU VIP CIPHER</strong> • ENCRYPTED STREAM
+    </div>
   </footer>
+
+  <script>
+    // SECURE DECRYPT RUNTIME
+    const _s1 = atob("${encodedStream}");
+    const _s2 = atob("${encodedBackup}");
+    let currentSrc = 1;
+
+    const frame = document.getElementById('cinema-frame');
+    frame.src = _s1;
+
+    function switchStream() {
+      const btn = document.getElementById('switchSourceBtn');
+      if (currentSrc === 1) {
+        frame.src = _s2;
+        currentSrc = 2;
+        btn.innerText = "🔄 Switch Source (Server 1)";
+      } else {
+        frame.src = _s1;
+        currentSrc = 1;
+        btn.innerText = "🔄 Switch Source (Server 2)";
+      }
+    }
+
+    // ANTI-HACK / ANTI-DEVTOOLS SHIELD
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('keydown', e => {
+      // Block F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U, Ctrl+S
+      if (
+        e.keyCode === 123 || 
+        (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) ||
+        (e.ctrlKey && (e.keyCode === 85 || e.keyCode === 83))
+      ) {
+        e.preventDefault();
+        return false;
+      }
+    });
+
+    // Detect DevTools console opening
+    let devtoolsOpen = false;
+    const threshold = 160;
+    setInterval(() => {
+      if (window.outerWidth - window.innerWidth > threshold || window.outerHeight - window.innerHeight > threshold) {
+        if (!devtoolsOpen) {
+          devtoolsOpen = true;
+          document.body.innerHTML = '<div style="background:#000;color:#f43f5e;display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;font-size:24px;font-weight:bold;">⚠️ Unauthorized Developer Inspection Blocked By Nishu Shield.</div>';
+        }
+      }
+    }, 1000);
+  </script>
 </body>
 </html>`;
 
