@@ -2399,14 +2399,26 @@ async function handleCinemaSelect(interaction) {
       movieEmbed.setImage(movie.Poster);
     }
 
-    // Clean player stream links (Multiple HD fallback sources)
-    const streamSource1 = `https://vidsrc.to/embed/movie/${movie.imdbID}`;
-    const streamSource2 = `https://autoembed.to/movie/imdb/${movie.imdbID}`;
+    // Generate Secure One-Time Temporary Cinema Session Ticket (Anti-Resell & Anti-Sharing)
+    const sessionToken = require('crypto').randomBytes(16).toString('hex');
+    cinemaSessionTokens.set(sessionToken, {
+      userId: interaction.user.id,
+      imdbId: movie.imdbID,
+      title: movie.Title,
+      createdAt: Date.now(),
+      activated: false
+    });
+
+    const webPlayerUrl = `http://209.50.54.199/cinema/player?token=${sessionToken}&id=${movie.imdbID}&title=${encodeURIComponent(movie.Title.slice(0, 30))}`;
 
     const buttonRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
+        .setLabel('🍿 Open Nishu VIP Theater')
+        .setStyle(ButtonStyle.Link)
+        .setURL(webPlayerUrl),
+      new ButtonBuilder()
         .setCustomId(`cinema_create_room_${movie.imdbID}_${movie.Title.replace(/[^a-zA-Z0-9]/g, '').slice(0, 10)}`)
-        .setLabel('🍿 Create Private Cinema VC')
+        .setLabel('👥 Watch With Friends (Create VC)')
         .setStyle(ButtonStyle.Success)
     );
 
