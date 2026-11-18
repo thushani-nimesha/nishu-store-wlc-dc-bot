@@ -4661,12 +4661,14 @@ class MusicQueue {
     this.isPaused = false;
     this.volume = 100;
 
-    this.player.on(AudioPlayerStatus.Idle, () => {
-      // Remove finished song from queue
-      if (this.songs.length > 0) {
-        this.songs.shift();
+    this.player.on(AudioPlayerStatus.Idle, (oldState) => {
+      // Only advance queue if a song was actually playing and finished!
+      if (oldState.status === AudioPlayerStatus.Playing) {
+        if (this.songs.length > 0) {
+          this.songs.shift();
+        }
+        this.playNext();
       }
-      this.playNext();
     });
 
     this.player.on('error', error => {
