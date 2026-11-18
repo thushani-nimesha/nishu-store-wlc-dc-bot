@@ -397,17 +397,16 @@ app.get('/cinema/player', (req, res) => {
     </div>
   </header>
 
-  <div id="cinema-container">
+  <div id="cinema-container" ondblclick="toggleCinemaFullscreen()">
     <iframe 
       id="cinema-frame" 
       src="" 
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-      allowfullscreen>
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture">
     </iframe>
   </div>
 
   <footer>
-    <div class="stream-tip">💡 Discord Stream: In voice room, click "Share Screen 🖥️" and select this tab with audio!</div>
+    <div class="stream-tip">💡 Pro Tip: Click "⛶ Fullscreen" or press "F" / Double Click screen for Pure Nishu Fullscreen!</div>
     <div class="brand-protect">NISHU EXCLUSIVE • ENCRYPTED CIPHER</div>
   </footer>
 
@@ -420,24 +419,31 @@ app.get('/cinema/player', (req, res) => {
     // CUSTOM FULLSCREEN CONTROLLER:
     // Fullscreen on our container ensures the browser notification NEVER shows third-party domains!
     function toggleCinemaFullscreen() {
-      const container = document.getElementById('cinema-container');
+      const elem = document.documentElement; // Full page fullscreen
       const fsIcon = document.getElementById('fs-icon');
       if (!document.fullscreenElement) {
-        if (container.requestFullscreen) {
-          container.requestFullscreen();
-        } else if (container.webkitRequestFullscreen) {
-          container.webkitRequestFullscreen();
-        } else if (container.msRequestFullscreen) {
-          container.msRequestFullscreen();
+        if (elem.requestFullscreen) {
+          elem.requestFullscreen();
+        } else if (elem.webkitRequestFullscreen) {
+          elem.webkitRequestFullscreen();
+        } else if (elem.msRequestFullscreen) {
+          elem.msRequestFullscreen();
         }
-        fsIcon.innerText = "✕";
+        if (fsIcon) fsIcon.innerText = "✕";
       } else {
         if (document.exitFullscreen) {
           document.exitFullscreen();
         }
-        fsIcon.innerText = "⛶";
+        if (fsIcon) fsIcon.innerText = "⛶";
       }
     }
+
+    // Hotkey 'F' for clean fullscreen
+    document.addEventListener('keydown', e => {
+      if (e.key === 'f' || e.key === 'F') {
+        toggleCinemaFullscreen();
+      }
+    });
 
     // ANTI-HACK & DEVTOOLS LOCK
     document.addEventListener('contextmenu', e => e.preventDefault());
