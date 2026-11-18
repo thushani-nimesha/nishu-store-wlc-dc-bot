@@ -4682,8 +4682,16 @@ class MusicQueue {
     this.connection = joinVoiceChannel({
       channelId: this.voiceChannel.id,
       guildId: this.guildId,
-      adapterCreator: this.voiceChannel.guild.voiceAdapterCreator
+      adapterCreator: this.voiceChannel.guild.voiceAdapterCreator,
+      selfDeaf: false,
+      selfMute: false
     });
+
+    try {
+      await entersState(this.connection, VoiceConnectionStatus.Ready, 15000);
+    } catch (err) {
+      console.warn('Voice connection ready wait timed out:', err.message);
+    }
 
     this.connection.subscribe(this.player);
 
@@ -4778,6 +4786,10 @@ class MusicQueue {
 
       if (resource.volume) {
         resource.volume.setVolume(this.volume / 100);
+      }
+
+      if (this.connection) {
+        this.connection.subscribe(this.player);
       }
 
       this.player.play(resource);
