@@ -507,7 +507,7 @@ client.riffy.on("trackStart", async (player, track) => {
         `🎧 **Requested By:** ${requester}\n` +
         `🔊 **Channel:** <#${player.voiceChannel}>`)
       .setThumbnail(track.info.artworkUrl || track.info.thumbnail || `https://i.ytimg.com/vi/${track.info.identifier}/hqdefault.jpg`)
-      .setFooter({ text: 'NISHU MUSIC • Powered by High-Performance Lavalink' })
+      .setFooter({ text: 'NISHU MUSIC • Powered by Thushani Nimesha' })
       .setTimestamp();
 
     const controllerRow = new ActionRowBuilder().addComponents(
