@@ -276,8 +276,8 @@ app.get('/cinema/player', (req, res) => {
 });
 
 
-app.listen(PORT, () => {
-  console.log(`🌐 Web server & Admin Bridge listening on port ${PORT} (Keep-alive ready)`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🌐 Web server & Admin Bridge listening on 0.0.0.0:${PORT} (Keep-alive ready)`);
 });
 
 // Helper: Strip emojis / crowns from server name
@@ -674,7 +674,7 @@ client.once('ready', () => {
 // Setup VIP Cinema Panel in #🎬・vip-cinema
 async function setupCinemaPanel() {
   try {
-    const guild = client.guilds.cache.first();
+    const guild = client.guilds.cache.get('1566443333520461826') || client.guilds.cache.first();
     if (!guild) return;
     const cinemaChannel = guild.channels.cache.find(c => c.name.includes('vip-cinema'));
     if (!cinemaChannel) return;
