@@ -2142,7 +2142,8 @@ async function handleCinemaButton(interaction) {
               PermissionFlagsBits.Speak,
               PermissionFlagsBits.Stream,
               PermissionFlagsBits.MoveMembers,
-              PermissionFlagsBits.ManageChannels
+              PermissionFlagsBits.ManageChannels,
+              PermissionFlagsBits.UseEmbeddedActivities
             ]
           },
           {
@@ -2152,7 +2153,8 @@ async function handleCinemaButton(interaction) {
               PermissionFlagsBits.Connect,
               PermissionFlagsBits.Speak,
               PermissionFlagsBits.Stream,
-              PermissionFlagsBits.UseVAD
+              PermissionFlagsBits.UseVAD,
+              PermissionFlagsBits.UseEmbeddedActivities
             ]
           }
         ]
@@ -2164,7 +2166,7 @@ async function handleCinemaButton(interaction) {
       let activityUrl = null;
       try {
         const invite = await cinemaRoom.createInvite({
-          targetApplication: '755600276941176913', // Official Discord Watch Together Activity
+          targetApplication: '880218394199220274', // Official Discord Watch Together Activity
           targetType: 2, // Embedded Application
           maxAge: 7200
         });
@@ -2173,26 +2175,43 @@ async function handleCinemaButton(interaction) {
         console.warn('Activity invite fallback:', actErr.message);
       }
 
+      const streamSource1 = `https://vidsrc.to/embed/movie/${imdbID}`;
+      const streamSource2 = `https://autoembed.to/movie/imdb/${imdbID}`;
+
       const roomCreatedEmbed = new EmbedBuilder()
         .setColor(0x57F287)
         .setTitle('🍿 PRIVATE CINEMA ROOM CREATED!')
         .setDescription(
           `🎉 Your Private Watch Party Room is ready: ${cinemaRoom}!\n\n` +
-          '**📺 How to Watch Inside Discord (No External Websites):**\n' +
+          '**📺 How to Watch:**\n' +
           '1️⃣ **Join Your Room:** Click ' + cinemaRoom.toString() + ' to enter the voice channel.\n' +
-          '2️⃣ **Launch Cinema Screen:** Click the green **"🚀 Launch Watch Party Screen"** button below!\n' +
-          '3️⃣ Discord will open the synchronized cinema screen directly inside your voice room.\n' +
-          '4️⃣ You can invite your friends to this room to watch together in real-time!\n\n' +
+          '2️⃣ **Screen Share Option (Recommended):** Click **"🎬 Open HD Player"** to open the movie, then click **Share Screen 🖥️** in Discord so everyone in the room can watch together!\n' +
+          '3️⃣ **Discord Activity:** You can also launch Discord Watch Together using the activity button.\n\n' +
           '🧹 *This room will automatically delete when everyone leaves.*'
         )
-        .setFooter({ text: 'NISHU VIP Cinema • Pure Discord In-App Experience' });
+        .setFooter({ text: 'NISHU VIP Cinema • Full HD Experience' });
 
-      const buttonRow = new ActionRowBuilder().addComponents(
+      const buttons = [];
+      if (activityUrl) {
+        buttons.push(
+          new ButtonBuilder()
+            .setLabel('🚀 Launch Watch Together')
+            .setStyle(ButtonStyle.Link)
+            .setURL(activityUrl)
+        );
+      }
+      buttons.push(
         new ButtonBuilder()
-          .setLabel('🚀 Launch Watch Party Screen')
+          .setLabel('🎬 Open HD Player (Stream Source 1)')
           .setStyle(ButtonStyle.Link)
-          .setURL(activityUrl || `https://discord.com/channels/${guild.id}/${cinemaRoom.id}`)
+          .setURL(streamSource1),
+        new ButtonBuilder()
+          .setLabel('🌐 Open Player (Backup Source 2)')
+          .setStyle(ButtonStyle.Link)
+          .setURL(streamSource2)
       );
+
+      const buttonRow = new ActionRowBuilder().addComponents(buttons);
 
       return interaction.editReply({ embeds: [roomCreatedEmbed], components: [buttonRow] });
     } catch (e) {
