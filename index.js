@@ -35,6 +35,8 @@ const {
   entersState,
   StreamType
 } = require('@discordjs/voice');
+const { spawn } = require('child_process');
+const ffmpegPath = require('ffmpeg-static');
 const ytdl = require('@distube/ytdl-core');
 const play = require('play-dl');
 const ytSearch = require('yt-search');
@@ -4718,12 +4720,28 @@ class MusicQueue {
     try {
       let resource = null;
 
-      // 1. Try Direct Invidious Stream (Fastest & 100% bypasses datacenter 410 / bot ban)
+      // 1. Try Direct High-Fidelity Audio Stream via ffmpeg-static
       if (currentSong.videoId) {
         try {
           const directAudioUrl = await resolveAudioStreamUrl(currentSong.videoId);
           if (directAudioUrl) {
-            resource = createAudioResource(directAudioUrl, {
+            const ffmpegProcess = spawn(ffmpegPath, [
+              '-reconnect', '1',
+              '-reconnect_streamed', '1',
+              '-reconnect_delay_max', '5',
+              '-i', directAudioUrl,
+              '-analyzeduration', '0',
+              '-loglevel', '0',
+              '-f', 'opus',
+              '-ar', '48000',
+              '-ac', '2',
+              'pipe:1'
+            ]);
+
+            ffmpegProcess.on('error', err => console.warn('ffmpeg spawn error:', err.message));
+
+            resource = createAudioResource(ffmpegProcess.stdout, {
+              inputType: StreamType.OggOpus,
               inlineVolume: true
             });
           }
@@ -4751,6 +4769,10 @@ class MusicQueue {
             inlineVolume: true
           });
         }
+      }
+
+      if (!resource) {
+        throw new Error('Could not extract any playable audio format from source.');
       }
 
       if (resource.volume) {
