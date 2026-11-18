@@ -401,7 +401,6 @@ app.get('/cinema/player', (req, res) => {
     </div>
 
     <div class="status-area">
-      <button class="server-switch-btn" id="switchSourceBtn" onclick="switchStream()">🔄 Switch Source (Backup)</button>
       <div class="live-pill">
         <div class="live-dot"></div>
         <span>VIP HD ACTIVE</span>
@@ -431,24 +430,8 @@ app.get('/cinema/player', (req, res) => {
   <script>
     // SECURE DECRYPT RUNTIME
     const _s1 = atob("${encodedStream}");
-    const _s2 = atob("${encodedBackup}");
-    let currentSrc = 1;
-
     const frame = document.getElementById('cinema-frame');
     frame.src = _s1;
-
-    function switchStream() {
-      const btn = document.getElementById('switchSourceBtn');
-      if (currentSrc === 1) {
-        frame.src = _s2;
-        currentSrc = 2;
-        btn.innerText = "🔄 Switch Source (Server 1)";
-      } else {
-        frame.src = _s1;
-        currentSrc = 1;
-        btn.innerText = "🔄 Switch Source (Server 2)";
-      }
-    }
 
     // ANTI-HACK / ANTI-DEVTOOLS SHIELD
     document.addEventListener('contextmenu', e => e.preventDefault());
