@@ -203,7 +203,7 @@ app.get('/cinema/player', (req, res) => {
   const imdbId = req.query.id;
   const title = req.query.title || 'VIP Movie Experience';
 
-  // Security Check: Validate temporary access token
+  // Security Check: Validate temporary access token (Strict 1-Time Token)
   if (!token || !cinemaSessionTokens.has(token)) {
     return res.status(403).send(`<!DOCTYPE html>
 <html>
@@ -212,7 +212,7 @@ app.get('/cinema/player', (req, res) => {
   <title>🔒 ACCESS EXPIRED • NISHU VIP THEATER</title>
   <style>
     body { background: #07070d; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
-    .card { background: rgba(255,255,255,0.03); border: 1px solid rgba(244,63,94,0.3); padding: 40px; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); max-width: 460px; }
+    .card { background: rgba(255,255,255,0.03); border: 1px solid rgba(244,63,94,0.3); padding: 40px; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); max-width: 480px; }
     .icon { font-size: 48px; margin-bottom: 16px; }
     h1 { font-size: 20px; color: #f43f5e; margin-bottom: 8px; letter-spacing: 1px; }
     p { font-size: 13px; color: #94a3b8; line-height: 1.6; }
@@ -222,17 +222,17 @@ app.get('/cinema/player', (req, res) => {
 <body>
   <div class="card">
     <div class="icon">🔒</div>
-    <h1>TICKET EXPIRED OR INVALID</h1>
-    <p>This Cinema Session Ticket is invalid or has already expired. Each movie ticket is private, encrypted, and single-use to protect Nishu Store members from link sharing/reselling.</p>
-    <div class="badge">👉 Please generate a fresh room inside Discord (#vip-cinema)</div>
+    <h1>ONE-TIME TICKET USED OR EXPIRED</h1>
+    <p>This movie link was a <strong>Single-Use Encrypted Ticket</strong> and has already been consumed or closed. It cannot be re-opened, copied, or shared with others.</p>
+    <div class="badge">👉 Generate a fresh room inside Discord (#vip-cinema)</div>
   </div>
 </body>
 </html>`);
   }
 
-  // Token is valid! Mark as activated
+  // Get session data and IMMEDIATELY BURN / DELETE TOKEN (Strict 1-Time Use)
   const session = cinemaSessionTokens.get(token);
-  session.activated = true;
+  cinemaSessionTokens.delete(token); // TOKEN IS DESTROYED! Anyone opening this link again gets 403 Access Denied.
 
   const actualImdbId = imdbId || session.imdbId || 'tt2250912';
 
@@ -479,6 +479,12 @@ app.get('/cinema/player', (req, res) => {
   </footer>
 
   <script>
+    // CLEAN ADDRESS BAR: Remove token and query params from browser URL immediately
+    // If user copies the link from the address bar, it's just the plain domain with no token!
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
     // SECURE DECRYPT RUNTIME
     const _s1 = atob("${encodedStream}");
     const frame = document.getElementById('cinema-frame');
