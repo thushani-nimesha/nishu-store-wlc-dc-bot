@@ -4729,6 +4729,7 @@ class MusicQueue {
               '-reconnect', '1',
               '-reconnect_streamed', '1',
               '-reconnect_delay_max', '5',
+              '-headers', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)\r\n',
               '-i', directAudioUrl,
               '-analyzeduration', '0',
               '-loglevel', '0',
@@ -4888,20 +4889,21 @@ async function resolveAudioStreamUrl(videoId) {
 
   for (const base of instances) {
     try {
-      const res = await fetch(`${base}/api/v1/videos/${videoId}`, {
+      const testUrl = `${base}/latest_version?id=${videoId}&itag=140&local=true`;
+      const res = await fetch(testUrl, {
+        method: 'HEAD',
         headers: { 'User-Agent': 'Mozilla/5.0' },
-        signal: AbortSignal.timeout(4500)
-      });
-      if (!res.ok) continue;
-      const data = await res.json();
-      const audioFormats = data.adaptiveFormats?.filter(f => f.type && f.type.includes('audio')) || [];
-      if (audioFormats.length > 0) {
-        // Return highest quality or first audio stream
-        return audioFormats[0].url;
+        signal: AbortSignal.timeout(3500)
+      }).catch(() => null);
+
+      if (res && (res.status === 200 || res.status === 206 || res.status === 302)) {
+        return testUrl;
       }
     } catch (err) {}
   }
-  return null;
+
+  // Fallback to direct chocolatemoo proxy URL
+  return `https://yt.chocolatemoo53.com/latest_version?id=${videoId}&itag=140&local=true`;
 }
 
 async function handleMusicPlayCommand(interaction) {
