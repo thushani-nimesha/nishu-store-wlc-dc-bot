@@ -2280,7 +2280,7 @@ async function handleCinemaButton(interaction) {
         console.warn('Activity invite fallback:', actErr.message);
       }
 
-      const webPlayerUrl = `http://209.50.54.199:3000/cinema/player?id=${imdbID}&title=${encodeURIComponent(shortTitle)}`;
+      const webPlayerUrl = `http://209.50.54.199/cinema/player?id=${imdbID}&title=${encodeURIComponent(shortTitle)}`;
 
       const roomCreatedEmbed = new EmbedBuilder()
         .setColor(0x57F287)
