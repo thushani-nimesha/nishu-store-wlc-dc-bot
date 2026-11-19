@@ -815,13 +815,6 @@ const client = new Client({
 // Configure Lavalink v4 nodes cluster with auto-failover
 const lavalinkNodes = [
   {
-    host: "lavalink.jirayu.net",
-    port: 443,
-    password: "youshallnotpass",
-    secure: true,
-    name: "Jirayu-Node-1"
-  },
-  {
     host: "lavalink.nazha.online",
     port: 443,
     password: "nazhafreelava",
@@ -829,12 +822,6 @@ const lavalinkNodes = [
     name: "Nazha-Node-2"
   },
   {
-    host: "lava-v4.millohost.my.id",
-    port: 443,
-    password: "https://discord.gg/mjS5J2K3ep",
-    secure: true,
-    name: "Millo-Node-3"
-  },  {
     host: "lavalinkv4.serenetia.com",
     port: 443,
     password: "https://seretia.link/discord",
@@ -965,10 +952,18 @@ for (let i = 0; i < workerTokens.length; i++) {
 
   workerClient.riffy = createRiffyForClient(workerClient);
 
-  workerClient.on('ready', () => {
-    console.log(`✅ Music Worker Bot #${i + 1} online as ${workerClient.user.tag}`);
-    workerClient.riffy.init(workerClient.user.id);
-  });
+  const initWorkerRiffy = () => {
+    if (workerClient.user && workerClient.riffy) {
+      workerClient.riffy.clientId = workerClient.user.id;
+      if (!workerClient.riffy.initiated) {
+        workerClient.riffy.init(workerClient.user.id);
+      }
+      console.log(`✅ Music Worker Bot #${i + 1} online as ${workerClient.user.tag}`);
+    }
+  };
+
+  workerClient.once('clientReady', initWorkerRiffy);
+  workerClient.on('ready', initWorkerRiffy);
 
   workerClient.login(token).catch(err => {
     console.warn(`⚠️ Failed to login Music Worker Bot #${i + 1}: ${err.message}`);
@@ -5330,13 +5325,31 @@ async function handleMusicPlayCommand(interaction) {
       deaf: true
     });
 
+    const safePlay = async () => {
+      if (player.playing || player.paused || player.queue.length === 0) return;
+      try {
+        await player.play();
+      } catch (playErr) {
+        console.warn('Initial player.play() waiting for voice state handshake:', playErr.message);
+        setTimeout(async () => {
+          if (!player.playing && player.queue.length > 0) {
+            try {
+              await player.play();
+            } catch (retryErr) {
+              console.error('SafePlay retry failed:', retryErr.message);
+            }
+          }
+        }, 1200);
+      }
+    };
+
     if (loadType === 'playlist') {
       for (const track of tracks) {
         track.info.requester = interaction.user.id;
         player.queue.add(track);
       }
 
-      if (!player.playing && !player.paused) player.play();
+      await safePlay();
 
       const playlistEmbed = new EmbedBuilder()
         .setColor(0x8B5CF6)
@@ -5358,7 +5371,7 @@ async function handleMusicPlayCommand(interaction) {
         await interaction.editReply({
           content: `🎶 Loading **${track.info.title}** into ${voiceChannel} via **${selectedClient.user?.username || 'Nishu Bot'}**...`
         });
-        player.play();
+        await safePlay();
       } else {
         const addedEmbed = new EmbedBuilder()
           .setColor(0x10B981)
