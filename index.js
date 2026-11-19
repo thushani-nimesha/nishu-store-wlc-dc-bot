@@ -834,15 +834,7 @@ const lavalinkNodes = [
     password: "https://discord.gg/mjS5J2K3ep",
     secure: true,
     name: "Millo-Node-3"
-  },
-  {
-    host: "lavalink-v4.triniumhost.com",
-    port: 443,
-    password: "free",
-    secure: true,
-    name: "Trinium-Node-4"
-  },
-  {
+  },  {
     host: "lavalinkv4.serenetia.com",
     port: 443,
     password: "https://seretia.link/discord",
