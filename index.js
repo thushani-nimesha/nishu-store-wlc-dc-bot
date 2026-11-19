@@ -874,9 +874,17 @@ function createRiffyForClient(targetClient) {
     console.warn(`⚠️ [${targetClient.user ? targetClient.user.tag : 'Init'}] Lavalink Node error (${node.name}):`, error.message);
   });
 
+  riffy.on("trackError", (player, track, error) => {
+    console.error(`❌ Track playback error in <#${player.voiceChannel}>:`, error);
+    const channel = client.channels.cache.get(player.textChannel);
+    if (channel) {
+      channel.send({ content: `⚠️ **Audio Stream Error:** Could not play **${track.info.title}**. Skipping to next track...` }).catch(() => {});
+    }
+    player.stop();
+  });
+
   riffy.on("trackStart", async (player, track) => {
     try {
-      // Send updates through main client so user interaction buttons remain consistent
       const channel = client.channels.cache.get(player.textChannel);
       if (!channel) return;
 
@@ -957,13 +965,13 @@ for (let i = 0; i < workerTokens.length; i++) {
 
   workerClient.riffy = createRiffyForClient(workerClient);
 
-  workerClient.once('clientReady', () => {
+  workerClient.on('ready', () => {
     console.log(`✅ Music Worker Bot #${i + 1} online as ${workerClient.user.tag}`);
     workerClient.riffy.init(workerClient.user.id);
   });
 
   workerClient.login(token).catch(err => {
-    console.warn(`⚠️ Failed to login Music Worker Bot #${i + 1}:`, err.message);
+    console.warn(`⚠️ Failed to login Music Worker Bot #${i + 1}: ${err.message}`);
   });
 
   musicWorkerBots.push(workerClient);
@@ -990,13 +998,11 @@ function findMusicPlayerInChannel(voiceChannelId) {
 
 // Helper: Find any player in a guild that member is currently in
 function findMusicPlayerInGuild(guildId, voiceChannelId) {
-  const allClients = getAllMusicClients();
-  // First check if there is a player in the user's voice channel
   if (voiceChannelId) {
     const inChannel = findMusicPlayerInChannel(voiceChannelId);
     if (inChannel) return inChannel;
   }
-  // Otherwise find any player in this guild
+  const allClients = getAllMusicClients();
   for (const c of allClients) {
     if (!c.riffy) continue;
     const player = c.riffy.players.get(guildId);
@@ -1005,21 +1011,34 @@ function findMusicPlayerInGuild(guildId, voiceChannelId) {
   return null;
 }
 
-// Helper: Get an available free music bot client
-function getAvailableMusicClient(voiceChannelId) {
+// Helper: Get available music bot client with Guild Membership check
+function getAvailableMusicClient(guild, voiceChannelId) {
   // If a bot is already in this channel, reuse it
   const existing = findMusicPlayerInChannel(voiceChannelId);
   if (existing) return existing.client;
 
   const allClients = getAllMusicClients();
-  for (const c of allClients) {
-    if (!c.riffy) continue;
-    // Check if this client is currently active in any guild player
+
+  // Prefer Main Client if free
+  if (client.riffy && client.riffy.players.size === 0) {
+    return client;
+  }
+
+  // Otherwise find a free worker client that is present in this Discord guild
+  for (const c of musicWorkerBots) {
+    if (!c.riffy || !c.user) continue;
+    if (guild && !c.guilds.cache.has(guild.id)) continue; // Must be in the guild!
     if (c.riffy.players.size === 0) {
       return c;
     }
   }
-  return null; // All 5 bots are busy
+
+  // Fallback: If all workers busy or not in guild, check if main client can take it
+  if (client.riffy && client.riffy.players.size === 0) {
+    return client;
+  }
+
+  return null; // All available bots are busy
 }
 
 client.once('clientReady', async () => {
@@ -5281,29 +5300,35 @@ async function handleMusicPlayCommand(interaction) {
   const query = interaction.options.getString('query');
 
   try {
-    // 1. Check or select an available bot client for this channel
-    let selectedClient = getAvailableMusicClient(voiceChannel.id);
+    // 1. Select available bot client with guild verification
+    let selectedClient = getAvailableMusicClient(interaction.guild, voiceChannel.id);
     if (!selectedClient) {
       return interaction.editReply({
         content: '⚠️ **All Music Bots are currently occupied** playing in other Voice Channels! Please wait until one finishes or join an active voice channel.'
       });
     }
 
-    // 2. Create or get existing Riffy player on the chosen client
-    const player = selectedClient.riffy.createConnection({
-      guildId: interaction.guild.id,
-      voiceChannel: voiceChannel.id,
-      textChannel: interaction.channel.id,
-      deaf: true
-    });
-
-    // 3. Resolve tracks through Lavalink node
+    // 2. Resolve tracks through Lavalink node
     const resolveRes = await selectedClient.riffy.resolve({
       query: query,
       requester: interaction.user.id
     });
 
     const { loadType, tracks, playlistInfo } = resolveRes;
+
+    if (!tracks || tracks.length === 0 || loadType === 'empty') {
+      return interaction.editReply({
+        content: `❌ No results found matching **"${query}"**! Please try a different song or link.`
+      });
+    }
+
+    // 3. Create or get existing Riffy player on the chosen client
+    const player = selectedClient.riffy.createConnection({
+      guildId: interaction.guild.id,
+      voiceChannel: voiceChannel.id,
+      textChannel: interaction.channel.id,
+      deaf: true
+    });
 
     if (loadType === 'playlist') {
       for (const track of tracks) {
@@ -5326,12 +5351,6 @@ async function handleMusicPlayCommand(interaction) {
 
     if (loadType === 'search' || loadType === 'track') {
       const track = tracks[0];
-      if (!track) {
-        return interaction.editReply({
-          content: `❌ No results found matching **"${query}"**!`
-        });
-      }
-
       track.info.requester = interaction.user.id;
       player.queue.add(track);
 
@@ -5359,7 +5378,7 @@ async function handleMusicPlayCommand(interaction) {
     }
 
     return interaction.editReply({
-      content: `❌ Could not find tracks for **"${query}"** (Type: ${loadType}). Please try a different song or link!`
+      content: `❌ Could not load tracks for **"${query}"** (Type: ${loadType}). Please try a different song or link!`
     });
   } catch (err) {
     console.error('Error in handleMusicPlayCommand:', err);
