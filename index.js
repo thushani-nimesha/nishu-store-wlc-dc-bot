@@ -813,14 +813,42 @@ const client = new Client({
   ],
 });
 
-// Configure Lavalink nodes for high-fidelity audio
+// Configure Lavalink v4 nodes cluster with auto-failover
 const lavalinkNodes = [
+  {
+    host: "lavalink.jirayu.net",
+    port: 443,
+    password: "youshallnotpass",
+    secure: true,
+    name: "Jirayu-Node-1"
+  },
+  {
+    host: "lavalink.nazha.online",
+    port: 443,
+    password: "nazhafreelava",
+    secure: true,
+    name: "Nazha-Node-2"
+  },
+  {
+    host: "lava-v4.millohost.my.id",
+    port: 443,
+    password: "https://discord.gg/mjS5J2K3ep",
+    secure: true,
+    name: "Millo-Node-3"
+  },
+  {
+    host: "lavalink-v4.triniumhost.com",
+    port: 443,
+    password: "free",
+    secure: true,
+    name: "Trinium-Node-4"
+  },
   {
     host: "lavalinkv4.serenetia.com",
     port: 443,
     password: "https://seretia.link/discord",
     secure: true,
-    name: "Serenetia-Node-1"
+    name: "Serenetia-Node-5"
   }
 ];
 
