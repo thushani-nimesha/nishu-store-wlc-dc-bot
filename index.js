@@ -845,7 +845,7 @@ function createRiffyForClient(targetClient) {
       const guild = targetClient.guilds.cache.get(payload.d.guild_id);
       if (guild) guild.shard.send(payload);
     },
-    defaultSearchPlatform: "ytmsearch",
+    defaultSearchPlatform: "scsearch",
     restVersion: "v4"
   });
 
@@ -5303,11 +5303,38 @@ async function handleMusicPlayCommand(interaction) {
       });
     }
 
-    // 2. Resolve tracks through Lavalink node
-    const resolveRes = await selectedClient.riffy.resolve({
-      query: query,
-      requester: interaction.user.id
-    });
+    // 2. Multi-Engine Resolve (SoundCloud High-Fidelity -> YouTube Music Fallback)
+    let resolveRes = null;
+    const isUrl = /^https?:\/\//i.test(query);
+
+    if (isUrl) {
+      resolveRes = await selectedClient.riffy.resolve({
+        query: query,
+        requester: interaction.user.id
+      }).catch(() => null);
+    } else {
+      // Try SoundCloud first (100% reliable on Lavalink, zero YouTube bot blocks)
+      resolveRes = await selectedClient.riffy.resolve({
+        query: query,
+        source: 'scsearch',
+        requester: interaction.user.id
+      }).catch(err => {
+        console.warn('SC resolve error:', err.message);
+        return null;
+      });
+
+      // If no tracks or empty, seamlessly fallback to YouTube Music
+      if (!resolveRes || !resolveRes.tracks || resolveRes.tracks.length === 0 || resolveRes.loadType === 'empty') {
+        resolveRes = await selectedClient.riffy.resolve({
+          query: query,
+          source: 'ytmsearch',
+          requester: interaction.user.id
+        }).catch(err => {
+          console.warn('YTM resolve error:', err.message);
+          return null;
+        });
+      }
+    }
 
     const { loadType, tracks, playlistInfo } = resolveRes;
 
