@@ -868,13 +868,41 @@ function createRiffyForClient(targetClient) {
     console.warn(`⚠️ [${targetClient.user ? targetClient.user.tag : 'Init'}] Lavalink Node error (${node.name}):`, error.message);
   });
 
-  riffy.on("trackError", (player, track, error) => {
-    console.error(`❌ Track playback error in <#${player.voiceChannel}>:`, error);
+  riffy.on("trackError", async (player, track, error) => {
+    console.error(`❌ Track playback error for "${track?.info?.title}":`, error?.message || error);
+    
+    // Auto-retry via SoundCloud stream if YouTube stream was blocked by YouTube
+    if (!track._fallbackRetried && track?.info?.title) {
+      track._fallbackRetried = true;
+      try {
+        console.log(`🔄 Auto-recovering "${track.info.title}" via SoundCloud fallback stream...`);
+        const searchTerms = track.info.title + (track.info.author ? ' ' + track.info.author : '');
+        const fallbackRes = await targetClient.riffy.resolve({
+          query: searchTerms,
+          source: 'scsearch',
+          requester: track.info.requester
+        }).catch(() => null);
+
+        if (fallbackRes?.tracks?.length > 0) {
+          const fallbackTrack = fallbackRes.tracks[0];
+          fallbackTrack._fallbackRetried = true;
+          player.queue.unshift(fallbackTrack);
+          return player.play().catch(() => {});
+        }
+      } catch (fbErr) {
+        console.warn('Fallback stream failed:', fbErr.message);
+      }
+    }
+
     const channel = client.channels.cache.get(player.textChannel);
     if (channel) {
-      channel.send({ content: `⚠️ **Audio Stream Error:** Could not play **${track.info.title}**. Skipping to next track...` }).catch(() => {});
+      channel.send({ content: `⚠️ **Audio Stream Error:** Could not play **${track?.info?.title || 'Track'}**.` }).catch(() => {});
     }
-    player.stop();
+    if (player.queue.length > 0) {
+      player.play().catch(() => player.stop());
+    } else {
+      player.stop();
+    }
   });
 
   riffy.on("trackStart", async (player, track) => {
