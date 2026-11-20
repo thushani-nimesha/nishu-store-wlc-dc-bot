@@ -961,12 +961,21 @@ function createRiffyForClient(targetClient) {
         const endEmbed = new EmbedBuilder()
           .setColor(0x8B5CF6)
           .setTitle('🎶 MUSIC QUEUE FINISHED')
-          .setDescription(`All tracks finished in <#${player.voiceChannel}>. Node \`${targetClient.user?.username || 'Worker'}\` disconnected!`)
+          .setDescription(`All tracks finished in <#${player.voiceChannel}>. Node \`${targetClient.user?.username || 'Worker'}\` leaving in 60s if idle...`)
           .setFooter({ text: 'NISHU MUSIC • Ready for next playback' });
         await channel.send({ embeds: [endEmbed] }).catch(() => {});
       }
     } catch (err) {}
-    player.destroy();
+
+    // Wait 60s before disconnecting to avoid reconnect lag if user adds another song
+    if (player._idleTimer) clearTimeout(player._idleTimer);
+    player._idleTimer = setTimeout(() => {
+      try {
+        if (player.queue.length === 0 && !player.playing) {
+          player.destroy();
+        }
+      } catch (e) {}
+    }, 60000);
   });
 
   return riffy;
@@ -5511,21 +5520,30 @@ async function handleMusicPlayCommand(interaction) {
       deaf: true
     });
 
+    // Clear idle disconnect timer if a new track is queued
+    if (player._idleTimer) {
+      clearTimeout(player._idleTimer);
+      player._idleTimer = null;
+    }
+
     const safePlay = async () => {
       if (player.playing || player.paused || player.queue.length === 0) return;
-      try {
-        await player.play();
-      } catch (playErr) {
-        console.warn('Initial player.play() waiting for voice state handshake:', playErr.message);
-        setTimeout(async () => {
-          if (!player.playing && player.queue.length > 0) {
-            try {
-              await player.play();
-            } catch (retryErr) {
-              console.error('SafePlay retry failed:', retryErr.message);
-            }
+      let attempts = 0;
+      while (attempts < 6) {
+        attempts++;
+        try {
+          if (player.playing || player.paused || player.queue.length === 0) return;
+          await player.play();
+          return;
+        } catch (playErr) {
+          if (attempts >= 6) {
+            console.error('All play() connection attempts failed:', playErr.message);
+            const ch = client.channels.cache.get(player.textChannel);
+            if (ch) ch.send({ content: `⚠️ Could not start playback: ${playErr.message}` }).catch(() => {});
+            return;
           }
-        }, 1200);
+          await new Promise(res => setTimeout(res, 800));
+        }
       }
     };
 
