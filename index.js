@@ -1053,7 +1053,35 @@ client.once('clientReady', async () => {
   initGiveaways();
   loadServerInvites();
   ensureFinanceRole();
+  purgeUnauthorizedFromOwnerChannels();
 });
+
+// Kick anyone currently sitting in owner-only channels who isn't the owner or a bot
+async function purgeUnauthorizedFromOwnerChannels() {
+  try {
+    for (const guild of client.guilds.cache.values()) {
+      await guild.channels.fetch();
+      const ownerChannels = guild.channels.cache.filter(c => 
+        c.isVoiceBased() && (c.name.toLowerCase().includes('owner') || c.name.includes('👑'))
+      );
+
+      for (const channel of ownerChannels.values()) {
+        for (const [memberId, member] of channel.members) {
+          const isOwner = memberId === guild.ownerId || member.user.bot;
+          if (!isOwner) {
+            await member.voice.disconnect('Owner-only voice channel protection purge').catch(() => {});
+            console.log(`🛡️ [Startup Purge] Kicked ${member.user.tag} from ${channel.name}`);
+            await member.send({
+              content: `⚠️ **Notice:** You were disconnected from **${channel.name}** because it is reserved for the **Server Owner** only.`
+            }).catch(() => {});
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('⚠️ Error during owner channel purge:', err.message);
+  }
+}
 
 client.once('ready', () => {
   console.log(`✅ Connected and ready as ${client.user.tag}!`);
@@ -2728,8 +2756,39 @@ async function handleCinemaModal(interaction) {
   await displayMovieSearchResults(interaction, query);
 }
 
-// Auto-Delete empty cinema voice rooms
+// Auto-Delete empty cinema voice rooms & Protect Owner-Only Voice Channels
 client.on('voiceStateUpdate', async (oldState, newState) => {
+  // 1. OWNER-ONLY VOICE CHANNEL PROTECTION
+  const targetChannel = newState.channel;
+  if (targetChannel) {
+    const channelName = targetChannel.name.toLowerCase();
+    const isOwnerChannel = channelName.includes('owner') || channelName.includes('👑');
+
+    if (isOwnerChannel) {
+      const guild = targetChannel.guild;
+      const member = newState.member;
+
+      // Allow if it's the Server Owner or a Bot (including this bot and music bots)
+      const isOwner = member && (member.id === guild.ownerId || member.user.bot);
+
+      if (!isOwner && member) {
+        try {
+          // Instantly disconnect unauthorized member
+          await member.voice.disconnect('Unauthorized access: Owner-only voice channel');
+          console.log(`🛡️ [Owner Channel Shield] Disconnected unauthorized user ${member.user.tag} (${member.id}) from ${targetChannel.name}`);
+
+          // Try to send a polite DM warning
+          await member.send({
+            content: `⚠️ **Access Denied:** The voice channel **${targetChannel.name}** is strictly reserved for the **Server Owner** only.`
+          }).catch(() => {});
+        } catch (err) {
+          console.error(`⚠️ Failed to disconnect user ${member.id} from owner voice channel:`, err.message);
+        }
+      }
+    }
+  }
+
+  // 2. Cinema room cleanup
   const channel = oldState.channel;
   if (!channel) return;
 
@@ -5281,6 +5340,38 @@ function formatDuration(ms) {
   return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 }
 
+// Universal URL metadata extractor (Bypasses YouTube Lavalink bot-blocks)
+function fetchUrlSongTitle(url) {
+  return new Promise((resolve) => {
+    let endpoint = null;
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      endpoint = 'https://www.youtube.com/oembed?url=' + encodeURIComponent(url) + '&format=json';
+    } else if (url.includes('spotify.com')) {
+      endpoint = 'https://open.spotify.com/oembed?url=' + encodeURIComponent(url);
+    } else if (url.includes('soundcloud.com')) {
+      endpoint = 'https://soundcloud.com/oembed?url=' + encodeURIComponent(url) + '&format=json';
+    }
+
+    if (!endpoint) return resolve(null);
+
+    const https = require('https');
+    const req = https.get(endpoint, { timeout: 4000 }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          resolve(json.title ? (json.author_name ? `${json.title} ${json.author_name}` : json.title) : null);
+        } catch (e) {
+          resolve(null);
+        }
+      });
+    });
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => { req.destroy(); resolve(null); });
+  });
+}
+
 async function handleMusicPlayCommand(interaction) {
   await interaction.deferReply();
 
@@ -5303,17 +5394,35 @@ async function handleMusicPlayCommand(interaction) {
       });
     }
 
-    // 2. Multi-Engine Resolve (SoundCloud High-Fidelity -> YouTube Music Fallback)
+    // 2. Multi-Engine Universal Resolver (URL Support + Zero-Block Fallback)
     let resolveRes = null;
     const isUrl = /^https?:\/\//i.test(query);
 
     if (isUrl) {
+      // Direct Link resolve (YouTube, Spotify, SoundCloud URL)
       resolveRes = await selectedClient.riffy.resolve({
         query: query,
         requester: interaction.user.id
-      }).catch(() => null);
+      }).catch(err => {
+        console.warn('Direct URL resolve error:', err.message);
+        return null;
+      });
+
+      // If Lavalink fails on the direct YouTube/Spotify link (due to public IP bot-block):
+      if (!resolveRes || !resolveRes.tracks || resolveRes.tracks.length === 0 || resolveRes.loadType === 'empty') {
+        console.log('Direct URL resolution failed, attempting oEmbed title extraction...');
+        const extractedTitle = await fetchUrlSongTitle(query);
+        if (extractedTitle) {
+          console.log(`Extracted title: "${extractedTitle}", auto-resolving via SoundCloud...`);
+          resolveRes = await selectedClient.riffy.resolve({
+            query: extractedTitle,
+            source: 'scsearch',
+            requester: interaction.user.id
+          }).catch(() => null);
+        }
+      }
     } else {
-      // Try SoundCloud first (100% reliable on Lavalink, zero YouTube bot blocks)
+      // Search Query (Text): SoundCloud first (100% reliable, zero bot blocks)
       resolveRes = await selectedClient.riffy.resolve({
         query: query,
         source: 'scsearch',
@@ -5323,7 +5432,7 @@ async function handleMusicPlayCommand(interaction) {
         return null;
       });
 
-      // If no tracks or empty, seamlessly fallback to YouTube Music
+      // Seamlessly fallback to YouTube Music if SoundCloud has no match
       if (!resolveRes || !resolveRes.tracks || resolveRes.tracks.length === 0 || resolveRes.loadType === 'empty') {
         resolveRes = await selectedClient.riffy.resolve({
           query: query,
