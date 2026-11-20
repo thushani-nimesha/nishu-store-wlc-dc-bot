@@ -815,25 +815,25 @@ const client = new Client({
 // Configure Lavalink v4 nodes cluster with auto-failover
 const lavalinkNodes = [
   {
+    host: "127.0.0.1",
+    port: 2333,
+    password: "youshallnotpass",
+    secure: false,
+    name: "Localhost-Private-Node-0ms"
+  },
+  {
     host: "lava-v4.millohost.my.id",
     port: 443,
     password: "https://discord.gg/mjS5J2K3ep",
     secure: true,
-    name: "Millo-32Core-UltraFast"
+    name: "Millo-Backup"
   },
   {
     host: "lavalink.nazha.online",
     port: 443,
     password: "nazhafreelava",
     secure: true,
-    name: "Nazha-Node-2"
-  },
-  {
-    host: "lavalinkv4.serenetia.com",
-    port: 443,
-    password: "https://seretia.link/discord",
-    secure: true,
-    name: "Serenetia-Node-5"
+    name: "Nazha-Backup"
   }
 ];
 
@@ -1074,7 +1074,8 @@ async function purgeUnauthorizedFromOwnerChannels() {
 
       for (const channel of ownerChannels.values()) {
         for (const [memberId, member] of channel.members) {
-          const isOwner = memberId === guild.ownerId || member.user.bot;
+          const hasOwnerRole = member.roles?.cache?.has('1566955712851222699') || member.roles?.cache?.some(r => r.name.toLowerCase().includes('owner') || r.name.includes('👑'));
+          const isOwner = memberId === guild.ownerId || hasOwnerRole || member.user.bot;
           if (!isOwner) {
             await member.voice.disconnect('Owner-only voice channel protection purge').catch(() => {});
             console.log(`🛡️ [Startup Purge] Kicked ${member.user.tag} from ${channel.name}`);
@@ -2775,8 +2776,9 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
       const guild = targetChannel.guild;
       const member = newState.member;
 
-      // Allow if it's the Server Owner or a Bot (including this bot and music bots)
-      const isOwner = member && (member.id === guild.ownerId || member.user.bot);
+      // Allow if it's the Server Owner, has Owner role, or is a Bot (including this bot and music bots)
+      const hasOwnerRole = member?.roles?.cache?.has('1566955712851222699') || member?.roles?.cache?.some(r => r.name.toLowerCase().includes('owner') || r.name.includes('👑'));
+      const isOwner = member && (member.id === guild.ownerId || hasOwnerRole || member.user.bot);
 
       if (!isOwner && member) {
         try {
