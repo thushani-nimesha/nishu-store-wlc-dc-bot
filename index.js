@@ -852,7 +852,7 @@ function createRiffyForClient(targetClient) {
       const guild = targetClient.guilds.cache.get(payload.d.guild_id);
       if (guild) guild.shard.send(payload);
     },
-    defaultSearchPlatform: "ytmsearch",
+    defaultSearchPlatform: "scsearch",
     restVersion: "v4"
   });
 
@@ -5460,24 +5460,24 @@ async function handleMusicPlayCommand(interaction) {
         }
       }
     } else {
-      // Query search: Try YouTube Music first
+      // Query search: Prioritize SoundCloud (100% reliable stream, zero YouTube bot-block drops)
       resolveRes = await selectedClient.riffy.resolve({
         query: query,
-        source: 'ytmsearch',
+        source: 'scsearch',
         requester: interaction.user.id
       }).catch(err => {
-        console.warn('YTM resolve error:', err.message);
+        console.warn('SC resolve error:', err.message);
         return null;
       });
 
-      // Fallback 1: SoundCloud
+      // Fallback 1: YouTube Music (if SoundCloud has no matches)
       if (!resolveRes || !resolveRes.tracks || resolveRes.tracks.length === 0 || resolveRes.loadType === 'empty') {
         resolveRes = await selectedClient.riffy.resolve({
           query: query,
-          source: 'scsearch',
+          source: 'ytmsearch',
           requester: interaction.user.id
         }).catch(err => {
-          console.warn('SC resolve error:', err.message);
+          console.warn('YTM resolve error:', err.message);
           return null;
         });
       }
