@@ -852,7 +852,7 @@ function createRiffyForClient(targetClient) {
       const guild = targetClient.guilds.cache.get(payload.d.guild_id);
       if (guild) guild.shard.send(payload);
     },
-    defaultSearchPlatform: "scsearch",
+    defaultSearchPlatform: "dzsearch",
     restVersion: "v4"
   });
 
@@ -871,15 +871,15 @@ function createRiffyForClient(targetClient) {
   riffy.on("trackError", async (player, track, error) => {
     console.error(`❌ Track playback error for "${track?.info?.title}":`, error?.message || error);
     
-    // Auto-retry via SoundCloud stream if YouTube stream was blocked by YouTube
+    // Auto-retry via Deezer HQ stream if original stream failed
     if (!track._fallbackRetried && track?.info?.title) {
       track._fallbackRetried = true;
       try {
-        console.log(`🔄 Auto-recovering "${track.info.title}" via SoundCloud fallback stream...`);
+        console.log(`🔄 Auto-recovering "${track.info.title}" via Deezer CD-Quality stream...`);
         const searchTerms = track.info.title + (track.info.author ? ' ' + track.info.author : '');
         const fallbackRes = await targetClient.riffy.resolve({
           query: searchTerms,
-          source: 'scsearch',
+          source: 'dzsearch',
           requester: track.info.requester
         }).catch(() => null);
 
@@ -890,7 +890,7 @@ function createRiffyForClient(targetClient) {
           return player.play().catch(() => {});
         }
       } catch (fbErr) {
-        console.warn('Fallback stream failed:', fbErr.message);
+        console.warn('Deezer fallback stream failed:', fbErr.message);
       }
     }
 
@@ -5460,17 +5460,17 @@ async function handleMusicPlayCommand(interaction) {
         }
       }
     } else {
-      // Query search: Prioritize SoundCloud (100% reliable stream, zero YouTube bot-block drops)
+      // Query search: Prioritize Deezer 320kbps (Zero YouTube bot-block drops, flawless audio)
       resolveRes = await selectedClient.riffy.resolve({
         query: query,
-        source: 'scsearch',
+        source: 'dzsearch',
         requester: interaction.user.id
       }).catch(err => {
-        console.warn('SC resolve error:', err.message);
+        console.warn('Deezer resolve error:', err.message);
         return null;
       });
 
-      // Fallback 1: YouTube Music (if SoundCloud has no matches)
+      // Fallback 1: YouTube Music
       if (!resolveRes || !resolveRes.tracks || resolveRes.tracks.length === 0 || resolveRes.loadType === 'empty') {
         resolveRes = await selectedClient.riffy.resolve({
           query: query,
