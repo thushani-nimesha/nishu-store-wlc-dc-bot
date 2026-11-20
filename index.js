@@ -819,7 +819,21 @@ const lavalinkNodes = [
     port: 2333,
     password: "youshallnotpass",
     secure: false,
-    name: "Localhost-Private-Node-0ms"
+    name: "Localhost-Private-0ms"
+  },
+  {
+    host: "lavalink.nazha.online",
+    port: 443,
+    password: "nazhafreelava",
+    secure: true,
+    name: "Nazha-Node-Online"
+  },
+  {
+    host: "lavalinkv4.serenetia.com",
+    port: 443,
+    password: "https://seretia.link/discord",
+    secure: true,
+    name: "Serenetia-Node-Online"
   }
 ];
 
@@ -838,7 +852,7 @@ function createRiffyForClient(targetClient) {
       const guild = targetClient.guilds.cache.get(payload.d.guild_id);
       if (guild) guild.shard.send(payload);
     },
-    defaultSearchPlatform: "scsearch",
+    defaultSearchPlatform: "ytmsearch",
     restVersion: "v4"
   });
 
@@ -5389,52 +5403,65 @@ async function handleMusicPlayCommand(interaction) {
       });
     }
 
-    // 2. Multi-Engine Universal Resolver (URL Support + Zero-Block Fallback)
+    // 2. Multi-Engine Universal Resolver (YouTube Music -> SoundCloud -> YouTube Fallback)
     let resolveRes = null;
     const isUrl = /^https?:\/\//i.test(query);
 
     if (isUrl) {
-      // Direct Link resolve (YouTube, Spotify, SoundCloud URL)
       resolveRes = await selectedClient.riffy.resolve({
         query: query,
         requester: interaction.user.id
-      }).catch(err => {
-        console.warn('Direct URL resolve error:', err.message);
-        return null;
-      });
+      }).catch(() => null);
 
-      // If Lavalink fails on the direct YouTube/Spotify link (due to public IP bot-block):
       if (!resolveRes || !resolveRes.tracks || resolveRes.tracks.length === 0 || resolveRes.loadType === 'empty') {
-        console.log('Direct URL resolution failed, attempting oEmbed title extraction...');
         const extractedTitle = await fetchUrlSongTitle(query);
         if (extractedTitle) {
-          console.log(`Extracted title: "${extractedTitle}", auto-resolving via SoundCloud...`);
           resolveRes = await selectedClient.riffy.resolve({
             query: extractedTitle,
-            source: 'scsearch',
+            source: 'ytmsearch',
             requester: interaction.user.id
           }).catch(() => null);
+
+          if (!resolveRes || !resolveRes.tracks || resolveRes.tracks.length === 0 || resolveRes.loadType === 'empty') {
+            resolveRes = await selectedClient.riffy.resolve({
+              query: extractedTitle,
+              source: 'scsearch',
+              requester: interaction.user.id
+            }).catch(() => null);
+          }
         }
       }
     } else {
-      // Search Query (Text): SoundCloud first (100% reliable, zero bot blocks)
+      // Query search: Try YouTube Music first
       resolveRes = await selectedClient.riffy.resolve({
         query: query,
-        source: 'scsearch',
+        source: 'ytmsearch',
         requester: interaction.user.id
       }).catch(err => {
-        console.warn('SC resolve error:', err.message);
+        console.warn('YTM resolve error:', err.message);
         return null;
       });
 
-      // Seamlessly fallback to YouTube Music if SoundCloud has no match
+      // Fallback 1: SoundCloud
       if (!resolveRes || !resolveRes.tracks || resolveRes.tracks.length === 0 || resolveRes.loadType === 'empty') {
         resolveRes = await selectedClient.riffy.resolve({
           query: query,
-          source: 'ytmsearch',
+          source: 'scsearch',
           requester: interaction.user.id
         }).catch(err => {
-          console.warn('YTM resolve error:', err.message);
+          console.warn('SC resolve error:', err.message);
+          return null;
+        });
+      }
+
+      // Fallback 2: Standard YouTube
+      if (!resolveRes || !resolveRes.tracks || resolveRes.tracks.length === 0 || resolveRes.loadType === 'empty') {
+        resolveRes = await selectedClient.riffy.resolve({
+          query: query,
+          source: 'ytsearch',
+          requester: interaction.user.id
+        }).catch(err => {
+          console.warn('YT resolve error:', err.message);
           return null;
         });
       }
