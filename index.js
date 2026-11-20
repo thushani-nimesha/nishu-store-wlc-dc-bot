@@ -815,6 +815,13 @@ const client = new Client({
 // Configure Lavalink v4 nodes cluster with auto-failover
 const lavalinkNodes = [
   {
+    host: "lava-v4.millohost.my.id",
+    port: 443,
+    password: "https://discord.gg/mjS5J2K3ep",
+    secure: true,
+    name: "Millo-32Core-UltraFast"
+  },
+  {
     host: "lavalink.nazha.online",
     port: 443,
     password: "nazhafreelava",
