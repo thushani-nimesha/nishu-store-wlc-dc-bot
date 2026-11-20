@@ -820,20 +820,6 @@ const lavalinkNodes = [
     password: "youshallnotpass",
     secure: false,
     name: "Localhost-Private-Node-0ms"
-  },
-  {
-    host: "lava-v4.millohost.my.id",
-    port: 443,
-    password: "https://discord.gg/mjS5J2K3ep",
-    secure: true,
-    name: "Millo-Backup"
-  },
-  {
-    host: "lavalink.nazha.online",
-    port: 443,
-    password: "nazhafreelava",
-    secure: true,
-    name: "Nazha-Backup"
   }
 ];
 
