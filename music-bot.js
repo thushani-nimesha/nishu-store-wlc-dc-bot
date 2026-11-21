@@ -22,6 +22,7 @@ const {
 const play = require('play-dl');
 
 const workerTokens = [
+  process.env.DISCORD_TOKEN,
   process.env.MUSIC_NODE_1,
   process.env.MUSIC_NODE_2,
   process.env.MUSIC_NODE_3,
@@ -287,25 +288,21 @@ for (let i = 0; i < workerTokens.length; i++) {
     console.log(`🎶 [Music Bot #${i + 1}] Online as ${botClient.user.tag}`);
     botClient.user.setActivity('NISHU MUSIC 🎧', { type: ActivityType.Listening });
 
-    if (i === 0) {
-      try {
-        const rest = new REST({ version: '10' }).setToken(token);
-        const guild = botClient.guilds.cache.first();
-        if (guild) {
-          await rest.put(
-            Routes.applicationGuildCommands(botClient.user.id, guild.id),
-            { body: musicCommands }
-          );
-          console.log(`⚡ Instant Guild Slash Commands registered for ${guild.name}!`);
-        }
+    try {
+      const rest = new REST({ version: '10' }).setToken(token);
+      for (const guild of botClient.guilds.cache.values()) {
         await rest.put(
-          Routes.applicationCommands(botClient.user.id),
+          Routes.applicationGuildCommands(botClient.user.id, guild.id),
           { body: musicCommands }
-        );
-        console.log('✅ Global music slash commands registered!');
-      } catch (regErr) {
-        console.error('Failed to register slash commands:', regErr.message);
+        ).catch(() => {});
       }
+      await rest.put(
+        Routes.applicationCommands(botClient.user.id),
+        { body: musicCommands }
+      ).catch(() => {});
+      console.log(`✅ [${botClient.user.tag}] Registered slash commands!`);
+    } catch (regErr) {
+      console.error(`Failed to register slash commands for ${botClient.user.tag}:`, regErr.message);
     }
   });
 
