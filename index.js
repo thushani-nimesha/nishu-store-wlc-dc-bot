@@ -5513,12 +5513,26 @@ async function handleMusicPlayCommand(interaction) {
     }
 
     // 3. Create or get existing Riffy player on the chosen client
-    const player = selectedClient.riffy.createConnection({
-      guildId: interaction.guild.id,
-      voiceChannel: voiceChannel.id,
-      textChannel: interaction.channel.id,
-      deaf: true
-    });
+    // If bot is already sitting in another channel or desynced, ensure voice state is cleanly set
+    let player = selectedClient.riffy.players.get(interaction.guild.id);
+    if (!player) {
+      player = selectedClient.riffy.createConnection({
+        guildId: interaction.guild.id,
+        voiceChannel: voiceChannel.id,
+        textChannel: interaction.channel.id,
+        deaf: true
+      });
+    } else {
+      player.textChannel = interaction.channel.id;
+      if (player.voiceChannel !== voiceChannel.id || !player.connected) {
+        player.connect({
+          guildId: interaction.guild.id,
+          voiceChannel: voiceChannel.id,
+          deaf: true,
+          mute: false
+        });
+      }
+    }
 
     // Clear idle disconnect timer if a new track is queued
     if (player._idleTimer) {
@@ -5529,20 +5543,32 @@ async function handleMusicPlayCommand(interaction) {
     const safePlay = async () => {
       if (player.playing || player.paused || player.queue.length === 0) return;
       let attempts = 0;
-      while (attempts < 6) {
+      while (attempts < 8) {
         attempts++;
         try {
           if (player.playing || player.paused || player.queue.length === 0) return;
           await player.play();
           return;
         } catch (playErr) {
-          if (attempts >= 6) {
+          console.warn(`play() attempt ${attempts} warning:`, playErr.message);
+          if (attempts >= 8) {
             console.error('All play() connection attempts failed:', playErr.message);
             const ch = client.channels.cache.get(player.textChannel);
             if (ch) ch.send({ content: `⚠️ Could not start playback: ${playErr.message}` }).catch(() => {});
             return;
           }
-          await new Promise(res => setTimeout(res, 800));
+          // If connection wasn't initiated, re-send Discord Gateway voice packet
+          if (playErr.message && playErr.message.includes('Player connection is not initiated')) {
+            try {
+              player.connect({
+                guildId: interaction.guild.id,
+                voiceChannel: voiceChannel.id,
+                deaf: true,
+                mute: false
+              });
+            } catch (cErr) {}
+          }
+          await new Promise(res => setTimeout(res, 600));
         }
       }
     };
@@ -5628,7 +5654,18 @@ async function handleMusicStopCommand(interaction) {
     return interaction.reply({ content: '❌ Nishu Music Bot is not playing in your voice channel!', flags: 64 });
   }
 
-  match.player.destroy();
+  try {
+    match.player.stop();
+    match.player.queue.clear();
+    match.player.destroy();
+    const botMember = interaction.guild.members.cache.get(match.client.user.id);
+    if (botMember && botMember.voice) {
+      botMember.voice.disconnect().catch(() => {});
+    }
+  } catch (e) {
+    console.warn('Error during player stop/disconnect:', e.message);
+  }
+
   return interaction.reply({
     content: `⏹️ **Stopped playback, cleared the queue, and disconnected node ${match.client.user?.username || 'Bot'} from Voice!**`
   });
@@ -5724,7 +5761,15 @@ async function handleMusicButton(interaction) {
   }
 
   if (interaction.customId === 'music_btn_stop') {
-    player.destroy();
+    try {
+      player.stop();
+      player.queue.clear();
+      player.destroy();
+      const botMember = interaction.guild.members.cache.get(match.client.user.id);
+      if (botMember && botMember.voice) {
+        botMember.voice.disconnect().catch(() => {});
+      }
+    } catch (e) {}
     return interaction.reply({ content: '⏹️ Stopped music and disconnected!', flags: 64 });
   }
 
