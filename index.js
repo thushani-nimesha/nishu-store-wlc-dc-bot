@@ -3634,12 +3634,12 @@ async function setupStoreMenuPanel() {
       .setTitle('🛍️ NISHU STORE // OFFICIAL DIGITAL STORE CATALOG')
       .setDescription(
         'Welcome to **NISHU STORE | PREMIUM DIGITAL**! 💜\n\n' +
-        'Browse our verified collection of premium AI accounts, free data VPN tunnels, Canva suites, and YouTube watch hours.\n\n' +
+        'Browse our verified collection of premium AI accounts, developer tools & API credits, streaming services, and VPN packages.\n\n' +
         '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
         '**🌟 WHY BUY FROM NISHU STORE?**\n' +
-        '• ⚡ **Instant Delivery:** Get credentials within 5-15 minutes.\n' +
-        '• 🛡️ **Guaranteed Warranty:** 100% full replacement warranty on all products.\n' +
-        '• 💳 **Easy Payments:** Bank Transfers, FriMi, eZ Cash, Binance USDT & Card.\n\n' +
+        '• ⚡ **Instant Delivery:** Get credentials / invite links within 5-15 minutes.\n' +
+        '• 🛡️ **Guaranteed Warranty:** Full replacement warranty on all products.\n' +
+        '• 💳 **Easy Payments:** Bank Transfers (BOC), FriMi, eZ Cash, Binance USDT & Card.\n\n' +
         '👇 **Select a product below to view pricing, full specs & order instantly:**'
       )
       .setImage('https://dummyimage.com/800x140/1e1b4b/a855f7&text=NISHU+STORE+•+PREMIUM+DIGITAL+CATALOG')
