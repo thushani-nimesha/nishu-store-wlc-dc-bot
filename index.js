@@ -1114,8 +1114,128 @@ client.once('clientReady', async () => {
   initGiveaways();
   loadServerInvites();
   ensureFinanceRole();
+  ensureOwnerSanctuaryChannel();
   purgeUnauthorizedFromOwnerChannels();
 });
+
+// Ensure Owner-Only Voice & Text Channel exists and is strictly hidden from ALL roles (including Admins)
+async function ensureOwnerSanctuaryChannel() {
+  try {
+    for (const guild of client.guilds.cache.values()) {
+      await guild.channels.fetch();
+      await guild.roles.fetch();
+
+      // Find or create the 👑・owner-sanctuary voice channel
+      let ownerVoice = guild.channels.cache.find(c => 
+        c.isVoiceBased() && (c.name.includes('owner-sanctuary') || c.name.includes('👑・owner') || (c.name.toLowerCase().includes('owner') && c.name.includes('👑')))
+      );
+
+      const ownerMember = await guild.fetchOwner().catch(() => null);
+      const ownerRoleId = '1566955712851222699'; // 👑 OWNER role
+      const everyoneRole = guild.roles.everyone;
+
+      // Permission Overwrites: Strict Privacy
+      // 1. @everyone: CANNOT view or connect
+      // 2. All Staff/Admin roles: explicitly CANNOT view or connect
+      // 3. Guild Owner: Full View, Connect, Speak
+      // 4. Owner Role: Full View, Connect, Speak
+      // 5. Bot & Worker Bots: Can View, Connect, Speak
+      const permissionOverwrites = [
+        {
+          id: everyoneRole.id,
+          deny: [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.Connect,
+            PermissionFlagsBits.Speak
+          ]
+        }
+      ];
+
+      // Block all admin / staff roles explicitly so they cannot bypass
+      const blockRoleIds = [
+        '1566956388213850153', // 💜 STORE MANAGER
+        '1566956542933213345', // 🛡️ ADMIN
+        '1566956709115728083'  // 🎫 SUPPORT TEAM
+      ];
+      for (const rId of blockRoleIds) {
+        if (guild.roles.cache.has(rId)) {
+          permissionOverwrites.push({
+            id: rId,
+            deny: [
+              PermissionFlagsBits.ViewChannel,
+              PermissionFlagsBits.Connect,
+              PermissionFlagsBits.Speak
+            ]
+          });
+        }
+      }
+
+      // Allow Owner by User ID
+      if (ownerMember) {
+        permissionOverwrites.push({
+          id: ownerMember.id,
+          allow: [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.Connect,
+            PermissionFlagsBits.Speak,
+            PermissionFlagsBits.Stream,
+            PermissionFlagsBits.UseVAD,
+            PermissionFlagsBits.PrioritySpeaker,
+            PermissionFlagsBits.ManageChannels
+          ]
+        });
+      }
+
+      // Allow 👑 OWNER role if it exists
+      if (guild.roles.cache.has(ownerRoleId)) {
+        permissionOverwrites.push({
+          id: ownerRoleId,
+          allow: [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.Connect,
+            PermissionFlagsBits.Speak,
+            PermissionFlagsBits.Stream,
+            PermissionFlagsBits.UseVAD,
+            PermissionFlagsBits.PrioritySpeaker
+          ]
+        });
+      }
+
+      // Allow Main Bot and all Worker Bots
+      const allBots = getAllMusicClients();
+      for (const b of allBots) {
+        if (b.user) {
+          permissionOverwrites.push({
+            id: b.user.id,
+            allow: [
+              PermissionFlagsBits.ViewChannel,
+              PermissionFlagsBits.Connect,
+              PermissionFlagsBits.Speak
+            ]
+          });
+        }
+      }
+
+      if (!ownerVoice) {
+        ownerVoice = await guild.channels.create({
+          name: '👑・owner-sanctuary',
+          type: ChannelType.GuildVoice,
+          bitrate: 96000,
+          userLimit: 5,
+          permissionOverwrites: permissionOverwrites
+        });
+        console.log(`🏰 Created Private Owner Voice Channel: ${ownerVoice.name}`);
+      } else {
+        // Update permissions on existing owner channel to ensure no admin can see or enter
+        await ownerVoice.permissionOverwrites.set(permissionOverwrites).catch(e => {
+          console.warn('Failed to update owner sanctuary permissions:', e.message);
+        });
+      }
+    }
+  } catch (err) {
+    console.error('⚠️ Error ensuring owner sanctuary channel:', err.message);
+  }
+}
 
 // Kick anyone currently sitting in owner-only channels who isn't the owner or a bot
 async function purgeUnauthorizedFromOwnerChannels() {
