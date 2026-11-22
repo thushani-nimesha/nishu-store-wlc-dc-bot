@@ -1009,6 +1009,23 @@ for (let i = 0; i < workerTokens.length; i++) {
   workerClient.once('clientReady', initWorkerRiffy);
   workerClient.on('ready', initWorkerRiffy);
 
+  // Handle slash commands & interactive buttons directed to this worker bot
+  workerClient.on('interactionCreate', async (interaction) => {
+    try {
+      if (interaction.isChatInputCommand()) {
+        if (interaction.commandName === 'play') await handleMusicPlayCommand(interaction);
+        else if (interaction.commandName === 'skip') await handleMusicSkipCommand(interaction);
+        else if (interaction.commandName === 'stop') await handleMusicStopCommand(interaction);
+        else if (interaction.commandName === 'queue') await handleMusicQueueCommand(interaction);
+        else if (interaction.commandName === 'nowplaying') await handleMusicNowPlayingCommand(interaction);
+      } else if (interaction.isButton() && interaction.customId.startsWith('music_btn_')) {
+        await handleMusicButton(interaction);
+      }
+    } catch (err) {
+      console.error(`Error handling interaction for Worker Bot #${i + 1}:`, err);
+    }
+  });
+
   workerClient.login(token).catch(err => {
     console.warn(`⚠️ Failed to login Music Worker Bot #${i + 1}: ${err.message}`);
   });
@@ -2420,7 +2437,55 @@ async function registerSlashCommands() {
       Routes.applicationCommands(client.user.id),
       { body: commands }
     );
-    console.log('✅ Successfully registered global slash commands!');
+    console.log('✅ Successfully registered global slash commands for main bot!');
+
+    // 3. Register Music commands for each active Worker Bot
+    const musicOnlyCommands = [
+      new SlashCommandBuilder()
+        .setName('play')
+        .setDescription('🎵 Play any song by name search or YouTube/Spotify URL')
+        .addStringOption(opt =>
+          opt
+            .setName('query')
+            .setDescription('Song title, artist, or YouTube/Spotify link')
+            .setRequired(true)
+        ),
+      new SlashCommandBuilder()
+        .setName('skip')
+        .setDescription('⏭️ Skip the currently playing track'),
+      new SlashCommandBuilder()
+        .setName('stop')
+        .setDescription('⏹️ Stop music, clear queue, and leave voice channel'),
+      new SlashCommandBuilder()
+        .setName('queue')
+        .setDescription('📜 View upcoming songs in the queue'),
+      new SlashCommandBuilder()
+        .setName('nowplaying')
+        .setDescription('🎶 View currently playing track with interactive controls')
+    ];
+
+    for (let i = 0; i < workerTokens.length; i++) {
+      const wToken = workerTokens[i];
+      const wBot = musicWorkerBots[i];
+      if (wToken && wBot && wBot.user) {
+        try {
+          const wRest = new REST({ version: '10' }).setToken(wToken);
+          if (guild) {
+            await wRest.put(
+              Routes.applicationGuildCommands(wBot.user.id, guild.id),
+              { body: musicOnlyCommands }
+            );
+          }
+          await wRest.put(
+            Routes.applicationCommands(wBot.user.id),
+            { body: musicOnlyCommands }
+          );
+          console.log(`⚡ Registered Music Slash Commands for Worker #${i + 1} (${wBot.user.tag})`);
+        } catch (wErr) {
+          console.warn(`⚠️ Failed to register commands for Worker #${i + 1}: ${wErr.message}`);
+        }
+      }
+    }
   } catch (err) {
     console.error('Error registering slash commands:', err);
   }
@@ -5432,8 +5497,18 @@ async function handleMusicPlayCommand(interaction) {
   const query = interaction.options.getString('query');
 
   try {
-    // 1. Select available bot client with guild verification
-    let selectedClient = getAvailableMusicClient(interaction.guild, voiceChannel.id);
+    // 1. Select bot client: If user ran command directly targeting a specific bot, prefer that bot if free/already in VC
+    let selectedClient = null;
+    const invoker = interaction.client;
+    if (invoker && invoker.riffy) {
+      const invokerPlayer = invoker.riffy.players.get(interaction.guild.id);
+      if (!invokerPlayer || invokerPlayer.voiceChannel === voiceChannel.id) {
+        selectedClient = invoker;
+      }
+    }
+    if (!selectedClient) {
+      selectedClient = getAvailableMusicClient(interaction.guild, voiceChannel.id);
+    }
     if (!selectedClient) {
       return interaction.editReply({
         content: '⚠️ **All Music Bots are currently occupied** playing in other Voice Channels! Please wait until one finishes or join an active voice channel.'
