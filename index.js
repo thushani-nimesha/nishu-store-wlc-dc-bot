@@ -1216,20 +1216,27 @@ async function ensureOwnerSanctuaryChannel() {
         }
       }
 
+      // Find suitable category (PREMIUM ACCESS, VIP, or top category)
+      const parentCat = guild.channels.cache.find(c => 
+        c.type === ChannelType.GuildCategory && (c.name.includes('PREMIUM') || c.name.includes('VIP') || c.name.includes('👑') || c.name.includes('MANAGEMENT'))
+      );
+
       if (!ownerVoice) {
         ownerVoice = await guild.channels.create({
           name: '👑・owner-sanctuary',
           type: ChannelType.GuildVoice,
           bitrate: 96000,
           userLimit: 5,
+          parent: parentCat ? parentCat.id : undefined,
           permissionOverwrites: permissionOverwrites
         });
-        console.log(`🏰 Created Private Owner Voice Channel: ${ownerVoice.name}`);
+        console.log(`🏰 Created Private Owner Voice Channel: ${ownerVoice.name} (ID: ${ownerVoice.id}) in category ${parentCat?.name || 'Root'}`);
       } else {
         // Update permissions on existing owner channel to ensure no admin can see or enter
         await ownerVoice.permissionOverwrites.set(permissionOverwrites).catch(e => {
           console.warn('Failed to update owner sanctuary permissions:', e.message);
         });
+        console.log(`🏰 Verified & Locked Down Owner Channel: ${ownerVoice.name} (ID: ${ownerVoice.id})`);
       }
     }
   } catch (err) {
@@ -1751,6 +1758,10 @@ client.on('interactionCreate', async (interaction) => {
 
     if (interaction.isChatInputCommand() && interaction.commandName === 'staff') {
       await handleStaffCommand(interaction);
+    }
+
+    if (interaction.isChatInputCommand() && interaction.commandName === 'ownerzone') {
+      await handleOwnerZoneCommand(interaction);
     }
 
     // 8.10 Finance Analytics Command
@@ -2536,7 +2547,10 @@ async function registerSlashCommands() {
         .setDescription('📜 View upcoming songs in the queue'),
       new SlashCommandBuilder()
         .setName('nowplaying')
-        .setDescription('🎶 View currently playing track with interactive controls')
+        .setDescription('🎶 View currently playing track with interactive controls'),
+      new SlashCommandBuilder()
+        .setName('ownerzone')
+        .setDescription('👑 [OWNER ONLY] Re-create and link the private Owner Sanctuary VC')
     ];
 
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
@@ -3050,6 +3064,44 @@ function isAdminOrOwner(member) {
   if (member.guild.ownerId === member.id) return true;
   if (member.permissions.has(PermissionFlagsBits.Administrator)) return true;
   return STAFF_ROLE_IDS.includes('1566955712851222699') && member.roles.cache.has('1566955712851222699');
+}
+
+// Handler for /ownerzone command
+async function handleOwnerZoneCommand(interaction) {
+  await interaction.deferReply({ flags: 64 });
+  const guild = interaction.guild;
+  const isServerOwner = interaction.user.id === guild.ownerId || interaction.member.roles.cache.has('1566955712851222699');
+
+  if (!isServerOwner) {
+    return interaction.editReply({
+      content: '⛔ **Access Denied:** Only the **Server Owner** can manage the Owner Sanctuary!'
+    });
+  }
+
+  try {
+    await ensureOwnerSanctuaryChannel();
+    const ownerVoice = guild.channels.cache.find(c => 
+      c.isVoiceBased() && (c.name.includes('owner-sanctuary') || c.name.includes('👑・owner'))
+    );
+
+    if (ownerVoice) {
+      return interaction.editReply({
+        content: `👑 **Owner Sanctuary is Ready & Protected!**\n\n` +
+                 `📍 **Voice Channel:** <#${ownerVoice.id}>\n` +
+                 `🔒 **Visibility:** Hidden from @everyone and ALL Admins/Staff\n` +
+                 `🎧 **Bitrate:** 96 kbps Ultra-HQ Audio\n` +
+                 `🤖 **Bots:** Main Bot + Music Workers allowed to join & stream`
+      });
+    } else {
+      return interaction.editReply({
+        content: '⚠️ Failed to find or create the Owner Sanctuary. Please check bot permissions!'
+      });
+    }
+  } catch (err) {
+    return interaction.editReply({
+      content: `❌ Error setting up Owner Sanctuary: ${err.message}`
+    });
+  }
 }
 
 // 1. /say Command (Send message/embed to specified channel)
