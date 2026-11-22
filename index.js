@@ -1226,7 +1226,7 @@ async function ensureOwnerSanctuaryChannel() {
           name: '👑・owner-sanctuary',
           type: ChannelType.GuildVoice,
           bitrate: 96000,
-          userLimit: 5,
+          userLimit: 0,
           parent: parentCat ? parentCat.id : undefined,
           permissionOverwrites: permissionOverwrites
         });
