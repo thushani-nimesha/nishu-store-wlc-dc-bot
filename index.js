@@ -1226,7 +1226,7 @@ async function ensureOwnerSanctuaryChannel() {
           name: '👑・owner-sanctuary',
           type: ChannelType.GuildVoice,
           bitrate: 96000,
-          userLimit: 0,
+          userLimit: 2, // Strictly reserved for Owner + 1 Music Bot
           parent: parentCat ? parentCat.id : undefined,
           permissionOverwrites: permissionOverwrites
         });
