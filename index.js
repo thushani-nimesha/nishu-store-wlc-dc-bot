@@ -1069,32 +1069,32 @@ function findMusicPlayerInGuild(guildId, voiceChannelId) {
 
 // Helper: Get available music bot client with Guild Membership check
 function getAvailableMusicClient(guild, voiceChannelId) {
-  // If a bot is already in this channel, reuse it
+  // 1. If a bot is ALREADY playing in THIS exact voice channel, reuse it to add to queue!
   const existing = findMusicPlayerInChannel(voiceChannelId);
   if (existing) return existing.client;
 
-  const allClients = getAllMusicClients();
-
-  // Prefer Main Client if free
-  if (client.riffy && client.riffy.players.size === 0) {
-    return client;
-  }
-
-  // Otherwise find a free worker client that is present in this Discord guild
+  // 2. Find a totally free Worker Bot (Nishu Music 1..4) that is not in ANY voice channel
   for (const c of musicWorkerBots) {
     if (!c.riffy || !c.user) continue;
-    if (guild && !c.guilds.cache.has(guild.id)) continue; // Must be in the guild!
-    if (c.riffy.players.size === 0) {
+    if (guild && !c.guilds.cache.has(guild.id)) continue;
+    const player = c.riffy.players.get(guild ? guild.id : null);
+    // Bot is considered free only if it has no player or player is not connected to a VC
+    const isBusy = player && (player.voiceChannel || player.connected || player.playing);
+    if (!isBusy && c.riffy.players.size === 0) {
       return c;
     }
   }
 
-  // Fallback: If all workers busy or not in guild, check if main client can take it
+  // 3. Fallback to Main Client ONLY if all 4 worker bots are busy in other VCs
   if (client.riffy && client.riffy.players.size === 0) {
-    return client;
+    const mainPlayer = client.riffy.players.get(guild ? guild.id : null);
+    const isMainBusy = mainPlayer && (mainPlayer.voiceChannel || mainPlayer.connected || mainPlayer.playing);
+    if (!isMainBusy) {
+      return client;
+    }
   }
 
-  return null; // All available bots are busy
+  return null; // All bots are busy in different voice channels!
 }
 
 client.once('clientReady', async () => {
@@ -5497,15 +5497,18 @@ async function handleMusicPlayCommand(interaction) {
   const query = interaction.options.getString('query');
 
   try {
-    // 1. Select bot client: If user ran command directly targeting a specific bot, prefer that bot if free/already in VC
+    // 1. Select bot client: If user ran command directly targeting a specific bot, prefer that bot ONLY IF free or already in the user's VC
     let selectedClient = null;
     const invoker = interaction.client;
     if (invoker && invoker.riffy) {
       const invokerPlayer = invoker.riffy.players.get(interaction.guild.id);
-      if (!invokerPlayer || invokerPlayer.voiceChannel === voiceChannel.id) {
+      const isFree = !invokerPlayer || (!invokerPlayer.voiceChannel && !invokerPlayer.connected && !invokerPlayer.playing);
+      const isAlreadyInSameChannel = invokerPlayer && invokerPlayer.voiceChannel === voiceChannel.id;
+      if (isAlreadyInSameChannel || isFree) {
         selectedClient = invoker;
       }
     }
+    // If targeted bot is busy in another channel or not available, automatically pick an idle bot!
     if (!selectedClient) {
       selectedClient = getAvailableMusicClient(interaction.guild, voiceChannel.id);
     }
