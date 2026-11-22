@@ -3744,16 +3744,15 @@ async function setupStoreMenuPanel() {
     const allEmbeds = [headerEmbed, vpnEmbed, aiEmbed, streamEmbed, otherEmbed];
     const allComponents = [actionRow, selectRow];
 
-    const messages = await storeMenuChannel.messages.fetch({ limit: 10 });
-    const botMsg = messages.find(m => m.author.id === client.user.id && m.embeds.length > 0 && m.embeds[0].title?.includes('DIGITAL STORE CATALOG'));
-    if (botMsg) {
-      await botMsg.edit({ embeds: allEmbeds, components: allComponents });
-      console.log('🔄 Updated existing Store Showcase Catalog in #store-menu (Option 2)!');
-      return;
+    const messages = await storeMenuChannel.messages.fetch({ limit: 20 });
+    const botMsgs = messages.filter(m => m.author.id === client.user.id);
+    for (const msg of botMsgs.values()) {
+      await msg.delete().catch(() => {});
     }
-
     await storeMenuChannel.send({ embeds: allEmbeds, components: allComponents });
-    console.log('✅ Posted Option 2 Store Showcase Catalog in #store-menu!');
+    console.log('✅ Freshly posted Option 2 Store Showcase Catalog in #store-menu!');
+    return;
+
   } catch (err) {
     console.error('Error in setupStoreMenuPanel:', err);
   }
