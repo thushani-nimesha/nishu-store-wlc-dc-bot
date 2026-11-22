@@ -4438,9 +4438,20 @@ async function handleVouchCommand(interaction) {
   }
 
   try {
-    const postedMsg = await targetChannel.send({ embeds: [vouchEmbed] });
-    await postedMsg.react('❤️').catch(() => {});
-    await postedMsg.react('⭐').catch(() => {});
+    let postedMsg = null;
+    if (targetChannel.type === ChannelType.GuildForum) {
+      const thread = await targetChannel.threads.create({
+        name: `⭐ ${rating}/5 • ${product} - ${interaction.user.username}`.slice(0, 95),
+        message: { embeds: [vouchEmbed] }
+      });
+      postedMsg = thread.message || (await thread.fetchStarterMessage().catch(() => null));
+    } else {
+      postedMsg = await targetChannel.send({ embeds: [vouchEmbed] });
+    }
+    if (postedMsg) {
+      await postedMsg.react('❤️').catch(() => {});
+      await postedMsg.react('⭐').catch(() => {});
+    }
   } catch (err) {
     console.error('Error posting vouch to channel:', err);
   }
@@ -5717,9 +5728,20 @@ async function handleModalVouchSubmit(interaction) {
 
   if (targetChannel) {
     try {
-      const posted = await targetChannel.send({ embeds: [vouchEmbed] });
-      await posted.react('❤️').catch(() => {});
-      await posted.react('⭐').catch(() => {});
+      let posted = null;
+      if (targetChannel.type === ChannelType.GuildForum) {
+        const thread = await targetChannel.threads.create({
+          name: `⭐ ${rating}/5 • ${product} - ${interaction.user.username}`.slice(0, 95),
+          message: { embeds: [vouchEmbed] }
+        });
+        posted = thread.message || (await thread.fetchStarterMessage().catch(() => null));
+      } else {
+        posted = await targetChannel.send({ embeds: [vouchEmbed] });
+      }
+      if (posted) {
+        await posted.react('❤️').catch(() => {});
+        await posted.react('⭐').catch(() => {});
+      }
     } catch (e) {
       console.warn('Could not post vouch to channel:', e.message);
     }
