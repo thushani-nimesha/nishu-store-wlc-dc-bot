@@ -1109,6 +1109,8 @@ client.once('clientReady', async () => {
   setupCinemaPanel();
   setupBotTextsPanel();
   setupStoreMenuPanel();
+  setupPriceListPanel();
+  setupPremiumDealsPanel();
   setupInviteRewardsPanel();
   registerSlashCommands();
   initGiveaways();
@@ -3904,6 +3906,172 @@ async function setupStoreMenuPanel() {
     console.log('✅ Posted Master Table + Categorized 1-by-1 Vertical Buttons in #store-menu!');
   } catch (err) {
     console.error('Error in setupStoreMenuPanel:', err);
+  }
+}
+
+// Setup Clean Master Price Table in #💰・price-list
+async function setupPriceListPanel() {
+  try {
+    const guild = client.guilds.cache.first();
+    if (!guild) return;
+
+    const priceListChannel = guild.channels.cache.find(c => c.name.includes('price-list'));
+    if (!priceListChannel) return;
+
+    // Purge old bot messages
+    try {
+      const messages = await priceListChannel.messages.fetch({ limit: 50 });
+      const botMsgs = messages.filter(m => m.author.id === client.user.id);
+      for (const msg of botMsgs.values()) {
+        await msg.delete().catch(() => {});
+      }
+    } catch (e) {}
+
+    const headerEmbed = new EmbedBuilder()
+      .setColor(0xF59E0B)
+      .setTitle('💰 NISHU STORE // OFFICIAL DIGITAL PRICING DIRECTORY')
+      .setDescription(
+        'Welcome to **#💰・price-list**! 💎\n' +
+        'Here you can find our complete, officially verified price and warranty directory.\n\n' +
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+        '🛡️ **100% Replacement Warranty & Anti-Revoke Guarantee**\n' +
+        '⚡ **Instant 5-15 Minute Delivery** upon payment confirmation\n' +
+        '💳 **Bank Transfer (BOC), FriMi, eZ Cash, Binance USDT** accepted\n' +
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+        '👉 *To purchase or view specifications, visit <#1566961548470255777> or click the button below!*'
+      )
+      .setImage('https://dummyimage.com/800x140/1e1b4b/10b981&text=NISHU+STORE+•+OFFICIAL+PRICE+LIST');
+
+    const tableText = 
+`\`\`\`prolog
+========================================================================
+            💜 NISHU STORE // OFFICIAL DIGITAL PRICE LIST 💜
+========================================================================
+#  PRODUCT NAME                     WARRANTY      USD       LKR (RS.)
+------------------------------------------------------------------------
+[ 🌐 VPN & FREE DATA INTERNET ]
+01 Free Data Internet Tunnel 1M     30 Days       $1.70     Rs.   500
+02 VPN Unlimited Tunnel 1M          30 Days       $1.70     Rs.   500
+03 Surfshark VPN 2M Coupon          Activation    $3.40     Rs. 1,130
+
+[ 🤖 AI ACCOUNTS & DEV TOOLS ]
+04 ChatGPT Plus / Go 3M Acc         5DW           $6.48     Rs. 2,150
+05 ChatGPT Plus Team (GPT-4o)       30DW          $8.20     Rs. 2,500
+06 Gemini Plus 6M Invite Link       12h Hold      $2.60     Rs.   860
+07 Gemini Plus 12M Invite Link      Activation    $3.99     Rs. 1,330
+08 Gemini Pro / Advanced (1M Ctx)   30DW          $3.30     Rs.   999
+09 Claude $100 API Credits (30D)    FW 10D        $5.00     Rs. 1,660
+10 Claude $500 API Credits (30D)    10DW          $10.00    Rs. 3,330
+11 Grok + Cursor Premium 1M         25DW          $16.00    Rs. 5,330
+12 Notion Business 3M Coupon        Activation    $3.80     Rs. 1,260
+
+[ 🍿 STREAMING & ENTERTAINMENT ]
+13 Netflix Ultra HD 4K (1 Year)     1 Year FW     $15.90    Rs. 5,290
+14 Netflix UHD 4K (1M Shared)       1 Week        $3.00     Rs. 1,000
+15 YouTube Premium 3M Link          Activation    $4.92     Rs. 1,640
+16 YouTube Premium Family (6M)      6M FW         $18.00    Rs. 5,990
+17 Spotify Premium 3M Coupon        Activation    $3.18     Rs. 1,060
+
+[ 🎨 CREATIVE & SOCIAL GROWTH ]
+18 CapCut Pro Video Editor 1M       30DW          $5.35     Rs. 1,780
+19 Canva Pro Lifetime / 1M          1 Month       $0.70     Rs.   200
+20 YouTube Watch Hours (3 Hours)    Non-Drop      $0.35     Rs.   100
+========================================================================
+* FW = Full Warranty | DW = Days Warranty | 100% Guaranteed Replacement *
+\`\`\``;
+
+    const tableEmbed = new EmbedBuilder()
+      .setColor(0x10B981)
+      .setTitle('📊 COMPLETE DIGITAL PRICE & WARRANTY SHEET')
+      .setDescription(tableText)
+      .setFooter({ text: 'NISHU STORE • 24/7 Verified Digital Solutions' })
+      .setTimestamp();
+
+    const linkRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setLabel('🛒 Go to Store Menu (Buy Now)')
+        .setStyle(ButtonStyle.Link)
+        .setURL('https://discord.com/channels/' + guild.id + '/1566961548470255777'),
+      new ButtonBuilder()
+        .setLabel('🎫 Open a Support Ticket')
+        .setStyle(ButtonStyle.Link)
+        .setURL('https://discord.com/channels/' + guild.id + '/1566968095422287912'),
+      new ButtonBuilder()
+        .setLabel('💳 Payment Methods')
+        .setStyle(ButtonStyle.Link)
+        .setURL('https://discord.com/channels/' + guild.id + '/1566962312512933968')
+    );
+
+    await priceListChannel.send({ embeds: [headerEmbed, tableEmbed], components: [linkRow] });
+    console.log('✅ Posted Master Price Table in #price-list!');
+  } catch (err) {
+    console.error('Error in setupPriceListPanel:', err);
+  }
+}
+
+// Setup High-Value Bundles & Special Offers in #✨・premium-deals
+async function setupPremiumDealsPanel() {
+  try {
+    const guild = client.guilds.cache.first();
+    if (!guild) return;
+
+    const dealsChannel = guild.channels.cache.find(c => c.name.includes('premium-deals'));
+    if (!dealsChannel) return;
+
+    // Purge old bot messages
+    try {
+      const messages = await dealsChannel.messages.fetch({ limit: 50 });
+      const botMsgs = messages.filter(m => m.author.id === client.user.id);
+      for (const msg of botMsgs.values()) {
+        await msg.delete().catch(() => {});
+      }
+    } catch (e) {}
+
+    const headerEmbed = new EmbedBuilder()
+      .setColor(0x8B5CF6)
+      .setTitle('✨ NISHU STORE // EXCLUSIVE PREMIUM DEALS & COMBO PACKS')
+      .setDescription(
+        'Welcome to **#✨・premium-deals**! 🔥\n' +
+        'Save huge with our limited-time exclusive mega combos & highest requested subscriptions!\n\n' +
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+        '👑 **DEAL 01: ULTIMATE AI DEV COMBO** 🤖⚡\n' +
+        '• **ChatGPT Plus (GPT-4o)** + **Cursor Pro / Grok (1 Month)**\n' +
+        '• Unlimited code generation, Claude 3.5 Sonnet & GPT-4o\n' +
+        '• **Special Bundle Price:** **Rs. 7,490** *(Save Rs. 340!)*\n\n' +
+        '🍿 **DEAL 02: 1-YEAR ENTERTAINMENT MASTER PACK** 📺🎵\n' +
+        '• **Netflix Premium Ultra HD 4K (1 Year FW)** + **Spotify 3M**\n' +
+        '• Ultra high definition streaming + Ad-free music\n' +
+        '• **Special Bundle Price:** **Rs. 5,990** *(Huge 1-Year Value!)*\n\n' +
+        '🎨 **DEAL 03: CONTENT CREATOR STARTER PACK** 🎬🎨\n' +
+        '• **CapCut Pro Video Editor (1M)** + **Canva Pro (1M)**\n' +
+        '• Premium effects, 4K exports, 100M+ design elements\n' +
+        '• **Special Bundle Price:** **Rs. 1,890** *(Instant Creator Pack)*\n\n' +
+        '🌐 **DEAL 04: PRIVACY & UNLIMITED DATA PACK** 🦈📶\n' +
+        '• **Free Data Internet Tunnel 1M** + **Surfshark VPN 2M**\n' +
+        '• Bypass ISP package restrictions with encrypted browsing\n' +
+        '• **Special Bundle Price:** **Rs. 1,500** *(Save Money!)*\n' +
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+        '👇 *Click below to grab a deal directly through our Order Desk!*'
+      )
+      .setImage('https://dummyimage.com/800x140/1e1b4b/a855f7&text=NISHU+STORE+•+EXCLUSIVE+PREMIUM+DEALS')
+      .setFooter({ text: 'NISHU STORE • Limited Stock & Priority Delivery' })
+      .setTimestamp();
+
+    const dealRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setLabel('🛒 Buy Now in #store-menu')
+        .setStyle(ButtonStyle.Link)
+        .setURL('https://discord.com/channels/' + guild.id + '/1566961548470255777'),
+      new ButtonBuilder()
+        .setLabel('🎫 Custom Bundle Request (Ticket)')
+        .setStyle(ButtonStyle.Link)
+        .setURL('https://discord.com/channels/' + guild.id + '/1566968095422287912')
+    );
+
+    await dealsChannel.send({ embeds: [headerEmbed], components: [dealRow] });
+    console.log('✅ Posted Exclusive Combos in #premium-deals!');
+  } catch (err) {
+    console.error('Error in setupPremiumDealsPanel:', err);
   }
 }
 
