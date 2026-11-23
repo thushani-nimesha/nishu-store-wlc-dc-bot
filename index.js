@@ -3677,7 +3677,7 @@ function getProducts() {
   return [];
 }
 
-// Setup Categorized Store Catalog with Buy Now Buttons in #💜・store-menu
+// Setup Master Price Table + Categorized 1-by-1 Vertical Buy Now Buttons in #💜・store-menu
 async function setupStoreMenuPanel() {
   try {
     const guild = client.guilds.cache.first();
@@ -3698,162 +3698,210 @@ async function setupStoreMenuPanel() {
       console.warn('Could not purge old store menu messages:', purgeErr.message);
     }
 
-    // 2. Main Header / Banner
+    // 2. Header & Store Information
     const headerEmbed = new EmbedBuilder()
       .setColor(0x8B5CF6)
       .setTitle('🛍️ NISHU STORE // OFFICIAL DIGITAL STORE CATALOG')
       .setDescription(
         'Welcome to **NISHU STORE | PREMIUM DIGITAL**! 💜\n' +
-        'Here is our complete verified catalog organized by category.\n' +
-        'Browse the categories below and click the direct **Buy Now** button to instantly order!\n\n' +
+        'Here is our complete verified catalog with instant delivery & replacement warranties.\n\n' +
         '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
         '**🌟 WHY CHOOSE NISHU STORE?**\n' +
         '• ⚡ **Instant Delivery:** Credentials / invite links delivered in 5-15 mins.\n' +
         '• 🛡️ **Guaranteed Warranty:** 100% full replacement covered on all items.\n' +
         '• 💳 **Easy Payments:** Bank Transfers (BOC), FriMi, eZ Cash, Binance USDT & Card.\n' +
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+        '👇 *Review the full price table below & click the direct **"Buy Now"** button for your product!*'
       )
       .setImage('https://dummyimage.com/800x140/1e1b4b/a855f7&text=NISHU+STORE+•+PREMIUM+DIGITAL+CATALOG');
 
-    await storeMenuChannel.send({ embeds: [headerEmbed] });
+    // 3. Big Professional Master Price Table Embed
+    const tableText = 
+`\`\`\`prolog
+========================================================================
+            💜 NISHU STORE // OFFICIAL DIGITAL PRICE LIST 💜
+========================================================================
+#  PRODUCT NAME                     WARRANTY      USD       LKR (RS.)
+------------------------------------------------------------------------
+[ 🌐 VPN & FREE DATA INTERNET ]
+01 Free Data Internet Tunnel 1M     30 Days       $1.70     Rs.   500
+02 VPN Unlimited Tunnel 1M          30 Days       $1.70     Rs.   500
+03 Surfshark VPN 2M Coupon          Activation    $3.40     Rs. 1,130
 
-    // 3. Category 1: VPN & FREE DATA INTERNET TUNNELS
+[ 🤖 AI ACCOUNTS & DEV TOOLS ]
+04 ChatGPT Plus / Go 3M Acc         5DW           $6.48     Rs. 2,150
+05 ChatGPT Plus Team (GPT-4o)       30DW          $8.20     Rs. 2,500
+06 Gemini Plus 6M Invite Link       12h Hold      $2.60     Rs.   860
+07 Gemini Plus 12M Invite Link      Activation    $3.99     Rs. 1,330
+08 Gemini Pro / Advanced (1M Ctx)   30DW          $3.30     Rs.   999
+09 Claude $100 API Credits (30D)    FW 10D        $5.00     Rs. 1,660
+10 Claude $500 API Credits (30D)    10DW          $10.00    Rs. 3,330
+11 Grok + Cursor Premium 1M         25DW          $16.00    Rs. 5,330
+12 Notion Business 3M Coupon        Activation    $3.80     Rs. 1,260
+
+[ 🍿 STREAMING & ENTERTAINMENT ]
+13 Netflix Ultra HD 4K (1 Year)     1 Year FW     $15.90    Rs. 5,290
+14 Netflix UHD 4K (1M Shared)       1 Week        $3.00     Rs. 1,000
+15 YouTube Premium 3M Link          Activation    $4.92     Rs. 1,640
+16 YouTube Premium Family (6M)      6M FW         $18.00    Rs. 5,990
+17 Spotify Premium 3M Coupon        Activation    $3.18     Rs. 1,060
+
+[ 🎨 CREATIVE & SOCIAL GROWTH ]
+18 CapCut Pro Video Editor 1M       30DW          $5.35     Rs. 1,780
+19 Canva Pro Lifetime / 1M          1 Month       $0.70     Rs.   200
+20 YouTube Watch Hours (3 Hours)    Non-Drop      $0.35     Rs.   100
+========================================================================
+* FW = Full Warranty | DW = Days Warranty | 100% Guaranteed Replacement *
+\`\`\``;
+
+    const tableEmbed = new EmbedBuilder()
+      .setColor(0x10B981)
+      .setTitle('📊 MASTER DIGITAL PRICING & WARRANTY SHEET')
+      .setDescription(tableText)
+      .setFooter({ text: 'NISHU STORE • 24/7 Automated Order Desk' });
+
+    // Send Table & Header first
+    await storeMenuChannel.send({ embeds: [headerEmbed, tableEmbed] });
+
+    // 4. Category 1: VPN & FREE DATA INTERNET (Buttons 1 by 1 / one down one)
     const vpnEmbed = new EmbedBuilder()
       .setColor(0x3B82F6)
       .setTitle('🌐 1. VPN & FREE DATA INTERNET TUNNELS')
       .setDescription(
-        'High-speed encrypted VPN connections and free unlimited data tunnels.\n\n' +
-        '📶 **Free Data Internet Tunnel (1 Month)**\n' +
-        '└ 💰 **Rs. 500** ($1.70) | ⏱️ Instant Link/QR | 🛡️ `30 Days Full Uptime`\n\n' +
-        '🛡️ **VPN Tunnel / Unlimited Proxy (1 Month)**\n' +
-        '└ 💰 **Rs. 500** ($1.70) | ⏱️ Instant Link/QR | 🛡️ `30 Days Full Uptime`\n\n' +
-        '🦈 **Surfshark VPN (2 Months Coupon)**\n' +
-        '└ 💰 **Rs. 1,130** ($3.40) | ⏱️ Instant Code | 🛡️ `Activation Warranty`'
-      )
-      .setFooter({ text: 'NISHU STORE • VPN & Internet' });
+        '• **01. Free Data Tunnel (1 Month)** — **Rs. 500** ($1.70)\n' +
+        '• **02. VPN Tunnel / Unlimited Proxy (1 Month)** — **Rs. 500** ($1.70)\n' +
+        '• **03. Surfshark VPN (2 Months Coupon)** — **Rs. 1,130** ($3.40)\n\n' +
+        '👇 *Click a product button below to buy:*'
+      );
 
-    const vpnRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('store_btn_buy_free_data_tunnel_1m').setLabel('01. Free Data (Rs.500)').setEmoji('📶').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId('store_btn_buy_vpn_tunnel_1m').setLabel('02. VPN Tunnel (Rs.500)').setEmoji('🛡️').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId('store_btn_buy_surfshark_2m').setLabel('03. Surfshark (Rs.1130)').setEmoji('🦈').setStyle(ButtonStyle.Primary)
+    const vpnRow1 = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('store_btn_buy_free_data_tunnel_1m').setLabel('🛒 Buy 01. Free Data Internet Tunnel (Rs. 500)').setEmoji('📶').setStyle(ButtonStyle.Primary)
+    );
+    const vpnRow2 = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('store_btn_buy_vpn_tunnel_1m').setLabel('🛒 Buy 02. VPN Tunnel / Unlimited Proxy (Rs. 500)').setEmoji('🛡️').setStyle(ButtonStyle.Primary)
+    );
+    const vpnRow3 = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('store_btn_buy_surfshark_2m').setLabel('🛒 Buy 03. Surfshark VPN 2M Coupon (Rs. 1,130)').setEmoji('🦈').setStyle(ButtonStyle.Primary)
     );
 
-    await storeMenuChannel.send({ embeds: [vpnEmbed], components: [vpnRow] });
+    await storeMenuChannel.send({ embeds: [vpnEmbed], components: [vpnRow1, vpnRow2, vpnRow3] });
 
-    // 4. Category 2: AI & PRODUCTIVITY ACCOUNTS
+    // 5. Category 2: AI & PRODUCTIVITY ACCOUNTS (Buttons 1 by 1 / one down one)
     const aiEmbed = new EmbedBuilder()
       .setColor(0x10B981)
       .setTitle('🤖 2. AI & PRODUCTIVITY ACCOUNTS')
       .setDescription(
-        'ChatGPT, Google Gemini AI and productivity workspace accounts.\n\n' +
-        '🤖 **ChatGPT Plus / Go (3 Months Account)**\n' +
-        '└ 💰 **Rs. 2,150** ($6.48) | 🛡️ `5 Days Warranty`\n\n' +
-        '🤖 **ChatGPT Plus / Team (GPT-4o Access)**\n' +
-        '└ 💰 **Rs. 2,500** ($8.20) | 🛡️ `30 Days Replacement`\n\n' +
-        '✨ **Gemini Plus (6 Months Invite / Link)**\n' +
-        '└ 💰 **Rs. 860** ($2.60) | 🛡️ `12 Hours Link Hold`\n\n' +
-        '✨ **Gemini Plus (12 Months Invite / Link)**\n' +
-        '└ 💰 **Rs. 1,330** ($3.99) | 🛡️ `Activation Warranty`\n\n' +
-        '✨ **Gemini Pro / Advanced (Google AI)**\n' +
-        '└ 💰 **Rs. 999** ($3.30) | 🛡️ `30 Days Full Warranty`\n\n' +
-        '📝 **Notion Business (3 Months Coupon)**\n' +
-        '└ 💰 **Rs. 1,260** ($3.80) | 🛡️ `Activation Warranty`'
-      )
-      .setFooter({ text: 'NISHU STORE • AI & Productivity' });
+        '• **04. ChatGPT Plus / Go 3M Account** — **Rs. 2,150** ($6.48)\n' +
+        '• **05. ChatGPT Plus Team (GPT-4o)** — **Rs. 2,500** ($8.20)\n' +
+        '• **06. Gemini Plus 6M Invite Link** — **Rs. 860** ($2.60)\n' +
+        '• **07. Gemini Plus 12M Invite Link** — **Rs. 1,330** ($3.99)\n' +
+        '• **08. Gemini Pro / Advanced (1M Ctx)** — **Rs. 999** ($3.30)\n' +
+        '• **09. Notion Business 3M Coupon** — **Rs. 1,260** ($3.80)\n\n' +
+        '👇 *Click a product button below to buy:*'
+      );
 
     const aiRow1 = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('store_btn_buy_chatgpt_go_3m').setLabel('04. ChatGPT 3M (Rs.2150)').setEmoji('🤖').setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId('store_btn_buy_chatgpt_plus').setLabel('05. GPT-4o Team (Rs.2500)').setEmoji('🤖').setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId('store_btn_buy_gemini_plus_6m').setLabel('06. Gemini 6M (Rs.860)').setEmoji('✨').setStyle(ButtonStyle.Success)
+      new ButtonBuilder().setCustomId('store_btn_buy_chatgpt_go_3m').setLabel('🛒 Buy 04. ChatGPT Plus 3M (Rs. 2,150)').setEmoji('🤖').setStyle(ButtonStyle.Success)
     );
-
     const aiRow2 = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('store_btn_buy_gemini_plus_12m').setLabel('07. Gemini 12M (Rs.1330)').setEmoji('✨').setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId('store_btn_buy_gemini_pro').setLabel('08. Gemini Pro (Rs.999)').setEmoji('✨').setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId('store_btn_buy_notion_business_3m').setLabel('09. Notion 3M (Rs.1260)').setEmoji('📝').setStyle(ButtonStyle.Success)
+      new ButtonBuilder().setCustomId('store_btn_buy_chatgpt_plus').setLabel('🛒 Buy 05. ChatGPT Plus Team (Rs. 2,500)').setEmoji('🤖').setStyle(ButtonStyle.Success)
+    );
+    const aiRow3 = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('store_btn_buy_gemini_plus_6m').setLabel('🛒 Buy 06. Gemini Plus 6M (Rs. 860)').setEmoji('✨').setStyle(ButtonStyle.Success)
+    );
+    const aiRow4 = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('store_btn_buy_gemini_plus_12m').setLabel('🛒 Buy 07. Gemini Plus 12M (Rs. 1,330)').setEmoji('✨').setStyle(ButtonStyle.Success)
+    );
+    const aiRow5 = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('store_btn_buy_gemini_pro').setLabel('🛒 Buy 08. Gemini Pro Advanced (Rs. 999)').setEmoji('✨').setStyle(ButtonStyle.Success)
     );
 
-    await storeMenuChannel.send({ embeds: [aiEmbed], components: [aiRow1, aiRow2] });
+    await storeMenuChannel.send({ embeds: [aiEmbed], components: [aiRow1, aiRow2, aiRow3, aiRow4, aiRow5] });
 
-    // 5. Category 3: DEVELOPER & API CREDITS
+    // Notion Business Row (as 6th button for AI)
+    const aiRow6 = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('store_btn_buy_notion_business_3m').setLabel('🛒 Buy 09. Notion Business 3M (Rs. 1,260)').setEmoji('📝').setStyle(ButtonStyle.Success)
+    );
+    await storeMenuChannel.send({ components: [aiRow6] });
+
+    // 6. Category 3: DEVELOPER & API CREDITS (Buttons 1 by 1 / one down one)
     const devEmbed = new EmbedBuilder()
       .setColor(0x6366F1)
       .setTitle('🧠 3. DEVELOPER & API CREDITS')
       .setDescription(
-        'Official API credits for Claude, Grok and AI coding editors.\n\n' +
-        '🧠 **Claude $100 API Credits (30 Days)**\n' +
-        '└ 💰 **Rs. 1,660** ($5.00) | 🛡️ `10 Days Full Warranty`\n\n' +
-        '🧠 **Claude $500 API Credits (30 Days)**\n' +
-        '└ 💰 **Rs. 3,330** ($10.00) | 🛡️ `10 Days Warranty`\n\n' +
-        '⚡ **Grok + Cursor Premium (1 Month)**\n' +
-        '└ 💰 **Rs. 5,330** ($16.00) | 🛡️ `25 Days Warranty`'
-      )
-      .setFooter({ text: 'NISHU STORE • Dev Tools & API' });
+        '• **10. Claude $100 API Credits (30D)** — **Rs. 1,660** ($5.00)\n' +
+        '• **11. Claude $500 API Credits (30D)** — **Rs. 3,330** ($10.00)\n' +
+        '• **12. Grok + Cursor Premium 1M** — **Rs. 5,330** ($16.00)\n\n' +
+        '👇 *Click a product button below to buy:*'
+      );
 
-    const devRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('store_btn_buy_claude_100_api').setLabel('10. Claude $100 (Rs.1660)').setEmoji('🧠').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId('store_btn_buy_claude_500_api').setLabel('11. Claude $500 (Rs.3330)').setEmoji('🧠').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId('store_btn_buy_grok_cursor_1m').setLabel('12. Grok+Cursor (Rs.5330)').setEmoji('⚡').setStyle(ButtonStyle.Primary)
+    const devRow1 = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('store_btn_buy_claude_100_api').setLabel('🛒 Buy 10. Claude $100 API Credits (Rs. 1,660)').setEmoji('🧠').setStyle(ButtonStyle.Primary)
+    );
+    const devRow2 = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('store_btn_buy_claude_500_api').setLabel('🛒 Buy 11. Claude $500 API Credits (Rs. 3,330)').setEmoji('🧠').setStyle(ButtonStyle.Primary)
+    );
+    const devRow3 = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('store_btn_buy_grok_cursor_1m').setLabel('🛒 Buy 12. Grok + Cursor Premium 1M (Rs. 5,330)').setEmoji('⚡').setStyle(ButtonStyle.Primary)
     );
 
-    await storeMenuChannel.send({ embeds: [devEmbed], components: [devRow] });
+    await storeMenuChannel.send({ embeds: [devEmbed], components: [devRow1, devRow2, devRow3] });
 
-    // 6. Category 4: STREAMING & ENTERTAINMENT
+    // 7. Category 4: STREAMING & ENTERTAINMENT (Buttons 1 by 1 / one down one)
     const streamEmbed = new EmbedBuilder()
       .setColor(0xEF4444)
       .setTitle('🍿 4. STREAMING & ENTERTAINMENT')
       .setDescription(
-        'Ultra HD 4K Movies, TV Shows, Music and Ad-free streaming packages.\n\n' +
-        '🍿 **Netflix Premium Ultra HD (1 Year)**\n' +
-        '└ 💰 **Rs. 5,290** ($15.90) | 🛡️ `1 Year Full Warranty`\n\n' +
-        '🍿 **Netflix Premium (1 Month Shared Profile)**\n' +
-        '└ 💰 **Rs. 1,000** ($3.00) | 🛡️ `1 Week Warranty`\n\n' +
-        '📺 **YouTube Premium (3 Months Link)**\n' +
-        '└ 💰 **Rs. 1,640** ($4.92) | 🛡️ `Activation Warranty`\n\n' +
-        '📺 **YouTube Premium Family (6 Months)**\n' +
-        '└ 💰 **Rs. 5,990** ($18.00) | 🛡️ `6 Months Full Warranty`\n\n' +
-        '🎵 **Spotify Premium (3 Months Coupon Link)**\n' +
-        '└ 💰 **Rs. 1,060** ($3.18) | 🛡️ `Activation Warranty`'
-      )
-      .setFooter({ text: 'NISHU STORE • Streaming Services' });
+        '• **13. Netflix Ultra HD 4K (1 Year)** — **Rs. 5,290** ($15.90)\n' +
+        '• **14. Netflix UHD 4K (1M Shared)** — **Rs. 1,000** ($3.00)\n' +
+        '• **15. YouTube Premium 3M Link** — **Rs. 1,640** ($4.92)\n' +
+        '• **16. YouTube Premium Family (6M)** — **Rs. 5,990** ($18.00)\n' +
+        '• **17. Spotify Premium 3M Coupon** — **Rs. 1,060** ($3.18)\n\n' +
+        '👇 *Click a product button below to buy:*'
+      );
 
     const streamRow1 = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('store_btn_buy_netflix_1yr_prem').setLabel('13. Netflix 1Yr (Rs.5290)').setEmoji('🍿').setStyle(ButtonStyle.Danger),
-      new ButtonBuilder().setCustomId('store_btn_buy_netflix_1m_shared').setLabel('14. Netflix 1M (Rs.1000)').setEmoji('🍿').setStyle(ButtonStyle.Danger),
-      new ButtonBuilder().setCustomId('store_btn_buy_youtube_premium_3m').setLabel('15. YT Prem 3M (Rs.1640)').setEmoji('📺').setStyle(ButtonStyle.Danger)
+      new ButtonBuilder().setCustomId('store_btn_buy_netflix_1yr_prem').setLabel('🛒 Buy 13. Netflix UHD 4K 1 Year (Rs. 5,290)').setEmoji('🍿').setStyle(ButtonStyle.Danger)
     );
-
     const streamRow2 = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('store_btn_buy_youtube_family_6m').setLabel('16. YT Family (Rs.5990)').setEmoji('📺').setStyle(ButtonStyle.Danger),
-      new ButtonBuilder().setCustomId('store_btn_buy_spotify_3m').setLabel('17. Spotify 3M (Rs.1060)').setEmoji('🎵').setStyle(ButtonStyle.Danger)
+      new ButtonBuilder().setCustomId('store_btn_buy_netflix_1m_shared').setLabel('🛒 Buy 14. Netflix UHD 1M Shared (Rs. 1,000)').setEmoji('🍿').setStyle(ButtonStyle.Danger)
+    );
+    const streamRow3 = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('store_btn_buy_youtube_premium_3m').setLabel('🛒 Buy 15. YouTube Premium 3M (Rs. 1,640)').setEmoji('📺').setStyle(ButtonStyle.Danger)
+    );
+    const streamRow4 = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('store_btn_buy_youtube_family_6m').setLabel('🛒 Buy 16. YouTube Premium Family 6M (Rs. 5,990)').setEmoji('📺').setStyle(ButtonStyle.Danger)
+    );
+    const streamRow5 = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('store_btn_buy_spotify_3m').setLabel('🛒 Buy 17. Spotify Premium 3M (Rs. 1,060)').setEmoji('🎵').setStyle(ButtonStyle.Danger)
     );
 
-    await storeMenuChannel.send({ embeds: [streamEmbed], components: [streamRow1, streamRow2] });
+    await storeMenuChannel.send({ embeds: [streamEmbed], components: [streamRow1, streamRow2, streamRow3, streamRow4, streamRow5] });
 
-    // 7. Category 5: CREATIVE, DESIGN & SOCIAL GROWTH
+    // 8. Category 5: CREATIVE, DESIGN & SOCIAL GROWTH (Buttons 1 by 1 / one down one)
     const creativeEmbed = new EmbedBuilder()
       .setColor(0xEC4899)
       .setTitle('🎨 5. CREATIVE, DESIGN & SOCIAL GROWTH')
       .setDescription(
-        'Professional video editing, graphics design and YouTube watch hours.\n\n' +
-        '🎬 **CapCut Pro (1 Month)**\n' +
-        '└ 💰 **Rs. 1,780** ($5.35) | 🛡️ `30 Days Full Warranty`\n\n' +
-        '🎨 **Canva Pro (1 Month)**\n' +
-        '└ 💰 **Rs. 200** ($0.70) | 🛡️ `1 Month Full Warranty`\n\n' +
-        '📈 **YouTube Watch Hours (3 Hours)**\n' +
-        '└ 💰 **Rs. 100** ($0.35) | 🛡️ `Non-Drop Safe Retention`'
-      )
-      .setFooter({ text: 'NISHU STORE • Creative & Social Growth' });
+        '• **18. CapCut Pro Video Editor (1M)** — **Rs. 1,780** ($5.35)\n' +
+        '• **19. Canva Pro Lifetime/1M** — **Rs. 200** ($0.70)\n' +
+        '• **20. YouTube Watch Hours (3 Hours)** — **Rs. 100** ($0.35)\n\n' +
+        '👇 *Click a product button below to buy:*'
+      );
 
-    const creativeRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('store_btn_buy_capcut_pro_1m').setLabel('18. CapCut 1M (Rs.1780)').setEmoji('🎬').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId('store_btn_buy_canva_pro_1m').setLabel('19. Canva 1M (Rs.200)').setEmoji('🎨').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId('store_btn_buy_yt_watch_hours_3h').setLabel('20. Watch Hours (Rs.100)').setEmoji('📈').setStyle(ButtonStyle.Secondary)
+    const creativeRow1 = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('store_btn_buy_capcut_pro_1m').setLabel('🛒 Buy 18. CapCut Pro 1M (Rs. 1,780)').setEmoji('🎬').setStyle(ButtonStyle.Secondary)
+    );
+    const creativeRow2 = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('store_btn_buy_canva_pro_1m').setLabel('🛒 Buy 19. Canva Pro 1M (Rs. 200)').setEmoji('🎨').setStyle(ButtonStyle.Secondary)
+    );
+    const creativeRow3 = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('store_btn_buy_yt_watch_hours_3h').setLabel('🛒 Buy 20. YouTube Watch Hours (Rs. 100)').setEmoji('📈').setStyle(ButtonStyle.Secondary)
     );
 
-    await storeMenuChannel.send({ embeds: [creativeEmbed], components: [creativeRow] });
+    await storeMenuChannel.send({ embeds: [creativeEmbed], components: [creativeRow1, creativeRow2, creativeRow3] });
 
-    console.log('✅ Posted Clean Categorized Panels with 20 Direct Buy Buttons in #store-menu!');
+    console.log('✅ Posted Master Table + Categorized 1-by-1 Vertical Buttons in #store-menu!');
   } catch (err) {
     console.error('Error in setupStoreMenuPanel:', err);
   }
