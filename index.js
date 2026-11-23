@@ -3968,12 +3968,9 @@ async function showProductOverviewCard(interaction, productId) {
     .setFooter({ text: `NISHU STORE • Product ID: ${product.id} • Official Genuine Store` })
     .setTimestamp();
 
+  // Official Brand Logo (Transparent / High-Res PNG) perfectly aligned with Discord's dark theme
   if (product.logo) {
     cardEmbed.setThumbnail(product.logo);
-  }
-
-  if (product.image) {
-    cardEmbed.setImage(product.image);
   }
 
   const actionRow = new ActionRowBuilder().addComponents(
