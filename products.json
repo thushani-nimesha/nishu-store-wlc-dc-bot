@@ -249,7 +249,7 @@
     "inStock": true,
     "description": "• xAI Grok + Cursor Pro/Premium AI Code Editor combo\n• Unlimited fast completions, Claude 3.5 Sonnet & GPT-4o models\n• 25 Days replacement warranty guarantee",
     "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/X_logo_2023_%28white%29.png/512px-X_logo_2023_%28white%29.png",
-    "localLogo": "x.svg"
+    "localLogo": "cursor_cube.png"
   },
   {
     "id": "netflix_1yr_prem",
@@ -263,7 +263,7 @@
     "inStock": true,
     "description": "• Netflix Premium 4K Ultra HD 1 Year access\n• Spatial audio, downloads & multi-language support\n• 100% Full replacement warranty for all 12 months",
     "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/Netflix_icon.svg/512px-Netflix_icon.svg.png",
-    "localLogo": "netflix.svg"
+    "localLogo": "netflix.png"
   },
   {
     "id": "netflix_1m_shared",
@@ -277,6 +277,6 @@
     "inStock": true,
     "description": "• Netflix Premium 4K UHD 1 Month shared profile\n• PIN-protected personal screen with custom watchlist\n• 1 Week replacement warranty",
     "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/Netflix_icon.svg/512px-Netflix_icon.svg.png",
-    "localLogo": "netflix.svg"
+    "localLogo": "netflix.png"
   }
 ]
