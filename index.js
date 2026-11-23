@@ -1863,7 +1863,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     // 10. Store Products & Catalog System
-    if (interaction.isButton() && interaction.customId.startsWith('store_btn_')) {
+    if (interaction.isButton() && (interaction.customId.startsWith('store_btn_') || interaction.customId.startsWith('store_action_'))) {
       await handleStoreButton(interaction);
     }
 
