@@ -1099,7 +1099,7 @@ function getAvailableMusicClient(guild, voiceChannelId) {
 
 client.once('clientReady', async () => {
   console.log(`✅ Logged in as ${client.user.tag}!`);
-  client.user.setActivity('NISHU STORE 🚀', { type: ActivityType.Watching });
+  client.user.setActivity('NISHU STORE', { type: ActivityType.Watching });
 
   // Initialize Riffy with bot client ID
   client.riffy.init(client.user.id);
