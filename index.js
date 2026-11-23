@@ -5021,11 +5021,12 @@ client.on('messageCreate', async (message) => {
         await handlePaymentSlipUpload(message);
         return; // Processed as payment slip, skip automod
       } else {
-        // If user uploaded a non-image file (e.g. .pdf, .txt, .zip, etc.)
-        const warnMsg = await message.reply({
-          content: '⚠️ **Image Only:** Please upload your payment receipt/slip as an **Image screenshot** (`.png`, `.jpg`, `.jpeg`, `.webp`, `.heic`) so our Finance Team can verify it!'
+        // If user uploaded a non-image file (e.g. .pdf, .txt, .zip, etc.) -> AUTO-DELETE IT!
+        await message.delete().catch(() => {});
+        const warnMsg = await message.channel.send({
+          content: `⚠️ ${message.author} **Image Only:** Non-image files are not allowed here! Please upload your payment slip as an **Image screenshot** (\`.png\`, \`.jpg\`, \`.jpeg\`, \`.webp\`, \`.heic\`).`
         }).catch(() => {});
-        setTimeout(() => warnMsg && warnMsg.delete().catch(() => {}), 15000);
+        setTimeout(() => warnMsg && warnMsg.delete().catch(() => {}), 10000);
         return;
       }
     }
