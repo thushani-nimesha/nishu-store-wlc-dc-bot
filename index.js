@@ -2121,25 +2121,24 @@ async function handleTicketCreate(interaction) {
 }
 
 // Handle Ticket Closing with Automated Transcript Generator
-async function handleTicketClose(interaction) {
+// Helper to execute transcript compilation, archival, DM delivery and channel deletion
+async function executeTicketClose(channel, closedByUser, initialInteraction = null) {
   try {
-    const channel = interaction.channel;
-
-    // Check if channel is inside the ticket category
-    if (channel.parentId !== TICKET_CATEGORY_ID) {
-      return interaction.reply({
-        content: '❌ This command can only be used inside a ticket channel!',
-        flags: 64
-      });
-    }
-
     const closeEmbed = new EmbedBuilder()
       .setColor(0xED4245)
       .setTitle('🔒 Ticket Closing // Generating Transcript')
       .setDescription('Saving full conversation transcript and closing ticket in **6 seconds**...')
       .setFooter({ text: 'NISHU STORE • Ticket Archival System' });
 
-    await interaction.reply({ embeds: [closeEmbed] });
+    if (initialInteraction) {
+      if (initialInteraction.deferred || initialInteraction.replied) {
+        await initialInteraction.followUp({ embeds: [closeEmbed] }).catch(() => {});
+      } else {
+        await initialInteraction.reply({ embeds: [closeEmbed] }).catch(() => {});
+      }
+    } else {
+      await channel.send({ embeds: [closeEmbed] }).catch(() => {});
+    }
 
     // 1. Fetch channel messages (up to 100) to build transcript
     let transcriptText = `=====================================================\n`;
@@ -2147,7 +2146,7 @@ async function handleTicketClose(interaction) {
     transcriptText += `=====================================================\n`;
     transcriptText += `Channel: #${channel.name}\n`;
     transcriptText += `Topic: ${channel.topic || 'N/A'}\n`;
-    transcriptText += `Closed By: ${interaction.user.tag} (${interaction.user.id})\n`;
+    transcriptText += `Closed By: ${closedByUser.tag} (${closedByUser.id})\n`;
     transcriptText += `Closed At: ${new Date().toISOString()}\n`;
     transcriptText += `=====================================================\n\n`;
 
@@ -2189,33 +2188,24 @@ async function handleTicketClose(interaction) {
     const transcriptBuffer = Buffer.from(transcriptText, 'utf-8');
     const transcriptAttachment = new AttachmentBuilder(transcriptBuffer, { name: `transcript-${channel.name}.txt` });
 
-    // 2. Send transcript & Review prompt to Customer DM if ticket owner found
+    // 2. Send transcript & receipt to Customer DM
     if (ticketOwnerId) {
       try {
         const ownerUser = await client.users.fetch(ticketOwnerId);
         if (ownerUser) {
           const dmCloseEmbed = new EmbedBuilder()
             .setColor(0x8B5CF6)
-            .setTitle('📦 TICKET CLOSED // YOUR TRANSCRIPT & REVIEW')
+            .setTitle('📦 TICKET CLOSED // YOUR TRANSCRIPT & RECEIPT')
             .setDescription(
               `Hello ${ownerUser.username}!\n\n` +
               `Your ticket **#${channel.name}** in **NISHU STORE** has been closed.\n\n` +
               `📄 We have attached the complete conversation history & receipt for your records.\n\n` +
-              `⭐ **How was your shopping experience?**\n` +
-              `Click the **"Leave a Review (⭐)"** button below to rate us and share your feedback!`
+              `⭐ Thank you for choosing **NISHU STORE**!`
             )
-            .setFooter({ text: 'NISHU STORE • Automated Order Records' })
+            .setFooter({ text: 'NISHU STORE • Order Records' })
             .setTimestamp();
 
-          const dmReviewRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-              .setCustomId(`btn_leave_vouch_${ownerUser.id}`)
-              .setLabel('Leave a Review (⭐)')
-              .setEmoji('⭐')
-              .setStyle(ButtonStyle.Success)
-          );
-
-          await ownerUser.send({ embeds: [dmCloseEmbed], components: [dmReviewRow], files: [transcriptAttachment] }).catch(() => {});
+          await ownerUser.send({ embeds: [dmCloseEmbed], files: [transcriptAttachment] }).catch(() => {});
         }
       } catch (dmErr) {
         console.warn('Could not send transcript to customer DM:', dmErr.message);
@@ -2230,7 +2220,7 @@ async function handleTicketClose(interaction) {
         .setTitle('📕 Ticket Closed & Archived')
         .addFields(
           { name: '💬 Channel', value: channel.name, inline: true },
-          { name: '👤 Closed By', value: `${interaction.user.tag} (${interaction.user.id})`, inline: true },
+          { name: '👤 Closed By', value: `${closedByUser.tag} (${closedByUser.id})`, inline: true },
           { name: 'ℹ️ Topic', value: channel.topic || 'N/A', inline: false }
         )
         .setTimestamp();
@@ -2243,7 +2233,77 @@ async function handleTicketClose(interaction) {
       });
     }, 6000);
   } catch (err) {
-    console.error('Error closing ticket:', err);
+    console.error('Error executing ticket closure:', err);
+  }
+}
+
+// Handle Ticket Closing with Mandatory / Pop-up Review Modal for Customer
+async function handleTicketClose(interaction) {
+  try {
+    const channel = interaction.channel;
+
+    // Check if channel is inside the ticket category
+    if (channel.parentId !== TICKET_CATEGORY_ID) {
+      return interaction.reply({
+        content: '❌ This command can only be used inside a ticket channel!',
+        flags: 64
+      });
+    }
+
+    // Extract ticket owner ID from topic if available
+    let ticketOwnerId = null;
+    let prefilledProduct = 'Nishu Store Service';
+    if (channel.topic) {
+      const match = channel.topic.match(/\((\d{17,20})\)/);
+      if (match) ticketOwnerId = match[1];
+
+      const prodMatch = channel.topic.match(/Product:\s*([^|]+)/i);
+      if (prodMatch) prefilledProduct = prodMatch[1].trim();
+    }
+
+    // If the customer themselves clicks "Close Ticket", show the Review Modal directly!
+    if (ticketOwnerId && interaction.user.id === ticketOwnerId) {
+      const modal = new ModalBuilder()
+        .setCustomId('modal_submit_vouch')
+        .setTitle('⭐ Rate Your Experience Before Closing');
+
+      const ratingInput = new TextInputBuilder()
+        .setCustomId('vouch_input_rating')
+        .setLabel('Rating (1 to 5 Stars)')
+        .setPlaceholder('Enter 5 for excellent, 4 for good...')
+        .setMinLength(1)
+        .setMaxLength(1)
+        .setValue('5')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+
+      const productInput = new TextInputBuilder()
+        .setCustomId('vouch_input_product')
+        .setLabel('Product / Service')
+        .setValue(prefilledProduct.slice(0, 50))
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+
+      const commentInput = new TextInputBuilder()
+        .setCustomId('vouch_input_comment')
+        .setLabel('Your Review & Feedback')
+        .setPlaceholder('Tell us about your experience (delivery speed, support, quality)...')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(true);
+
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(ratingInput),
+        new ActionRowBuilder().addComponents(productInput),
+        new ActionRowBuilder().addComponents(commentInput)
+      );
+
+      return await interaction.showModal(modal);
+    }
+
+    // If Staff or Admin closes the ticket, execute closure directly
+    await executeTicketClose(channel, interaction.user, interaction);
+  } catch (err) {
+    console.error('Error handling ticket close:', err);
   }
 }
 
@@ -5747,9 +5807,14 @@ async function handleModalVouchSubmit(interaction) {
     }
   }
 
-  return interaction.editReply({
-    content: `🎉 **Thank you so much for your review, ${interaction.user.username}!**\nYour review has been successfully posted in ${targetChannel || 'the reviews channel'}.`
+  await interaction.editReply({
+    content: `🎉 **Thank you so much for your review, ${interaction.user.username}!**\nYour review has been successfully posted in ${targetChannel || 'the reviews channel'}.\n\n🔒 *Now proceeding with ticket closure...*`
   });
+
+  // If this review was submitted from inside an active ticket channel, close it automatically!
+  if (interaction.channel && interaction.channel.parentId === TICKET_CATEGORY_ID) {
+    await executeTicketClose(interaction.channel, interaction.user);
+  }
 }
 
 // ==========================================
