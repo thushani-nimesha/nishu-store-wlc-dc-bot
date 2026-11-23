@@ -5007,7 +5007,7 @@ client.on('messageCreate', async (message) => {
     // Ignore bots and direct messages
     if (!message.guild || message.author.bot) return;
 
-    // A. DETECT PAYMENT SLIP UPLOAD IN ORDER / SUPPORT TICKETS
+    // A. DETECT PAYMENT SLIP UPLOAD IN ORDER / SUPPORT TICKETS (IMAGES ONLY)
     const isTicket = (message.channel.parentId === TICKET_CATEGORY_ID) || 
       (message.channel.name && (message.channel.name.startsWith('🛒・') || message.channel.name.startsWith('🛠️・') || message.channel.name.startsWith('ticket-') || message.channel.name.startsWith('order-')));
 
@@ -5016,9 +5016,17 @@ client.on('messageCreate', async (message) => {
         (a.contentType && a.contentType.startsWith('image/')) ||
         /\.(png|jpe?g|webp|gif|bmp|heic)$/i.test(a.name || '')
       );
+
       if (isImage) {
         await handlePaymentSlipUpload(message);
         return; // Processed as payment slip, skip automod
+      } else {
+        // If user uploaded a non-image file (e.g. .pdf, .txt, .zip, etc.)
+        const warnMsg = await message.reply({
+          content: '⚠️ **Image Only:** Please upload your payment receipt/slip as an **Image screenshot** (`.png`, `.jpg`, `.jpeg`, `.webp`, `.heic`) so our Finance Team can verify it!'
+        }).catch(() => {});
+        setTimeout(() => warnMsg && warnMsg.delete().catch(() => {}), 15000);
+        return;
       }
     }
 
