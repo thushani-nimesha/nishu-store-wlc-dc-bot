@@ -3917,6 +3917,69 @@ async function handleStoreSelect(interaction) {
 }
 
 // Display Beautiful Product Canvas/Card with Official Brand Logo & Buttons
+// Dynamic Custom Canvas Graphic Generator for Each Product
+function generateProductBannerCanvas(product) {
+  const width = 800;
+  const height = 280;
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+
+  // Modern sleek Discord dark theme gradient
+  const bgGrad = ctx.createLinearGradient(0, 0, width, height);
+  bgGrad.addColorStop(0, '#0c0d14');
+  bgGrad.addColorStop(0.5, '#16192b');
+  bgGrad.addColorStop(1, '#0f111a');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, width, height);
+
+  // Outer border with soft purple accent
+  ctx.strokeStyle = '#7c3aed';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(8, 8, width - 16, height - 16);
+
+  // Glow Circle
+  ctx.beginPath();
+  ctx.arc(95, 140, 55, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(124, 58, 237, 0.25)';
+  ctx.fill();
+  ctx.strokeStyle = '#00f2fe';
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  // Emoji inside circle
+  ctx.font = '55px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(product.categoryEmoji || '🛍️', 95, 145);
+
+  // Product Name
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 28px sans-serif';
+  ctx.fillText(product.name.toUpperCase().slice(0, 34), 180, 75);
+
+  // Price Highlights
+  ctx.fillStyle = '#10b981';
+  ctx.font = 'bold 26px sans-serif';
+  ctx.fillText(product.priceLKR + '   •   ' + product.priceUSD, 180, 120);
+
+  // Warranty & Delivery details
+  ctx.fillStyle = '#cbd5e1';
+  ctx.font = '18px sans-serif';
+  ctx.fillText('🛡️ Warranty: ' + product.warranty, 180, 168);
+  ctx.fillText('⚡ Delivery: ' + product.delivery, 180, 202);
+
+  // Official Store Verified Badge
+  ctx.fillStyle = '#7c3aed';
+  ctx.fillRect(180, 225, 230, 30);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 14px sans-serif';
+  ctx.fillText('★ NISHU STORE VERIFIED ★', 195, 246);
+
+  return canvas.toBuffer('image/png');
+}
+
+// Display Beautiful Product Canvas/Card with Official Brand Logo & Buttons
 async function showProductOverviewCard(interaction, productId) {
   const products = getProducts();
   const product = products.find(p => p.id === productId);
@@ -3940,6 +4003,10 @@ async function showProductOverviewCard(interaction, productId) {
   };
 
   const cardColor = categoryColors[product.category] || 0x8B5CF6;
+
+  // Generate dynamic canvas banner perfectly aligned with Discord's dark background
+  const bannerBuffer = generateProductBannerCanvas(product);
+  const bannerAttachment = new AttachmentBuilder(bannerBuffer, { name: `product-${product.id}.png` });
 
   const cardEmbed = new EmbedBuilder()
     .setColor(cardColor)
@@ -3965,13 +4032,9 @@ async function showProductOverviewCard(interaction, productId) {
       `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
       `👇 *Choose an option below to buy or ask tech questions:*`
     )
+    .setImage(`attachment://product-${product.id}.png`)
     .setFooter({ text: `NISHU STORE • Product ID: ${product.id} • Official Genuine Store` })
     .setTimestamp();
-
-  // Official Brand Logo (Transparent / High-Res PNG) perfectly aligned with Discord's dark theme
-  if (product.logo) {
-    cardEmbed.setThumbnail(product.logo);
-  }
 
   const actionRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -3992,6 +4055,7 @@ async function showProductOverviewCard(interaction, productId) {
   return interaction.reply({
     embeds: [cardEmbed],
     components: [actionRow],
+    files: [bannerAttachment],
     flags: 64
   });
 }
