@@ -3937,32 +3937,19 @@ async function generateProductBannerCanvas(product) {
   ctx.lineWidth = 3;
   ctx.strokeRect(8, 8, width - 16, height - 16);
 
-  // Glow Circle Container for Official Brand Logo
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(95, 140, 55, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(124, 58, 237, 0.2)';
-  ctx.fill();
-  ctx.strokeStyle = '#00f2fe';
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-
-  // Draw official brand logo
+  // Draw official brand logo directly without circle frame
   if (product.localLogo) {
     const logoPath = path.join(__dirname, 'assets', 'logos', product.localLogo);
     if (fs.existsSync(logoPath)) {
       try {
         const logoImg = await loadImage(logoPath);
-        ctx.beginPath();
-        ctx.arc(95, 140, 44, 0, Math.PI * 2);
-        ctx.clip();
-        ctx.drawImage(logoImg, 95 - 40, 140 - 40, 80, 80);
+        const logoSize = 96;
+        ctx.drawImage(logoImg, 95 - (logoSize / 2), 140 - (logoSize / 2), logoSize, logoSize);
       } catch (err) {
         console.error('Canvas logo draw error:', err);
       }
     }
   }
-  ctx.restore();
 
   // Product Name
   ctx.textAlign = 'left';
