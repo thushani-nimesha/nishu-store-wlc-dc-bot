@@ -3917,8 +3917,8 @@ async function handleStoreSelect(interaction) {
 }
 
 // Display Beautiful Product Canvas/Card with Official Brand Logo & Buttons
-// Dynamic Custom Canvas Graphic Generator for Each Product
-function generateProductBannerCanvas(product) {
+// Dynamic Custom Canvas Graphic Generator for Each Product with Brand Logos
+async function generateProductBannerCanvas(product) {
   const width = 800;
   const height = 280;
   const canvas = createCanvas(width, height);
@@ -3937,20 +3937,32 @@ function generateProductBannerCanvas(product) {
   ctx.lineWidth = 3;
   ctx.strokeRect(8, 8, width - 16, height - 16);
 
-  // Glow Circle
+  // Glow Circle Container for Official Brand Logo
+  ctx.save();
   ctx.beginPath();
   ctx.arc(95, 140, 55, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(124, 58, 237, 0.25)';
+  ctx.fillStyle = 'rgba(124, 58, 237, 0.2)';
   ctx.fill();
   ctx.strokeStyle = '#00f2fe';
   ctx.lineWidth = 2.5;
   ctx.stroke();
 
-  // Emoji inside circle
-  ctx.font = '55px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(product.categoryEmoji || '🛍️', 95, 145);
+  // Draw official brand logo
+  if (product.localLogo) {
+    const logoPath = path.join(__dirname, 'assets', 'logos', product.localLogo);
+    if (fs.existsSync(logoPath)) {
+      try {
+        const logoImg = await loadImage(logoPath);
+        ctx.beginPath();
+        ctx.arc(95, 140, 44, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(logoImg, 95 - 40, 140 - 40, 80, 80);
+      } catch (err) {
+        console.error('Canvas logo draw error:', err);
+      }
+    }
+  }
+  ctx.restore();
 
   // Product Name
   ctx.textAlign = 'left';
@@ -3964,10 +3976,13 @@ function generateProductBannerCanvas(product) {
   ctx.fillText(product.priceLKR + '   •   ' + product.priceUSD, 180, 120);
 
   // Warranty & Delivery details
+  const cleanWarranty = (product.warranty || '').replace(/[^\x20-\x7E]/g, '').trim();
+  const cleanDelivery = (product.delivery || '').replace(/[^\x20-\x7E]/g, '').trim();
+
   ctx.fillStyle = '#cbd5e1';
   ctx.font = '18px sans-serif';
-  ctx.fillText('🛡️ Warranty: ' + product.warranty, 180, 168);
-  ctx.fillText('⚡ Delivery: ' + product.delivery, 180, 202);
+  ctx.fillText('Warranty: ' + cleanWarranty, 180, 168);
+  ctx.fillText('Delivery: ' + cleanDelivery, 180, 202);
 
   // Official Store Verified Badge
   ctx.fillStyle = '#7c3aed';
@@ -4006,7 +4021,7 @@ async function showProductOverviewCard(interaction, productId) {
   const cardColor = categoryColors[product.category] || 0x8B5CF6;
 
   // Generate dynamic canvas banner perfectly aligned with Discord's dark background
-  const bannerBuffer = generateProductBannerCanvas(product);
+  const bannerBuffer = await generateProductBannerCanvas(product);
   const bannerAttachment = new AttachmentBuilder(bannerBuffer, { name: `product-${product.id}.png` });
 
   const cardEmbed = new EmbedBuilder()

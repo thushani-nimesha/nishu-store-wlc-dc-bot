@@ -10,7 +10,8 @@
     "warranty": "🛡️ 30 Days 100% Uptime Guarantee",
     "inStock": true,
     "description": "• Ultra-fast high-speed VLESS proxy / Free Data tunnel\n• Bypass social media / zoom / work packages to open all websites & apps\n• Supports Dialog, Mobitel, Airtel & Hutch with zero lag and high ping stability",
-    "logo": "https://cdn-icons-png.flaticon.com/512/93/93158.png"
+    "logo": "https://cdn-icons-png.flaticon.com/512/93/93158.png",
+    "localLogo": "vpn.png"
   },
   {
     "id": "vpn_tunnel_1m",
@@ -23,7 +24,8 @@
     "warranty": "🛡️ 30 Days 100% Uptime Guarantee",
     "inStock": true,
     "description": "• High-speed encrypted VPN tunnel connection\n• Full privacy protection, IP masking & bypass ISP geo-blocks\n• Works on V2rayNG, Happ, Nekobox, Shadowrocket (Android, iOS & PC)",
-    "logo": "https://cdn-icons-png.flaticon.com/512/2885/2885417.png"
+    "logo": "https://cdn-icons-png.flaticon.com/512/2885/2885417.png",
+    "localLogo": "vpn.png"
   },
   {
     "id": "surfshark_2m",
@@ -36,7 +38,8 @@
     "warranty": "🛡️ Coupon Activation Warranty",
     "inStock": true,
     "description": "• 2 Months premium access coupon for Surfshark VPN\n• Unlimited simultaneous device connections\n• CleanWeb ad-blocker, ultra-fast wireguard servers & leak protection",
-    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c9/Surfshark_logo.svg/512px-Surfshark_logo.svg.png"
+    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c9/Surfshark_logo.svg/512px-Surfshark_logo.svg.png",
+    "localLogo": "surfshark.svg"
   },
   {
     "id": "gemini_plus_6m",
@@ -49,7 +52,8 @@
     "warranty": "🛡️ 12 Hours Link Hold Warranty",
     "inStock": true,
     "description": "• Google Gemini Plus 6 Months activation link\n• Full access to Google AI premium models & Workspace integrations\n• 12hr link hold replacement guarantee",
-    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Google_Gemini_logo.svg/512px-Google_Gemini_logo.svg.png"
+    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Google_Gemini_logo.svg/512px-Google_Gemini_logo.svg.png",
+    "localLogo": "gemini.svg"
   },
   {
     "id": "gemini_plus_12m",
@@ -62,7 +66,8 @@
     "warranty": "🛡️ Activation Warranty",
     "inStock": true,
     "description": "• 1 Full Year (12 Months) Google Gemini Plus activation link\n• Premium AI features, large context window & cloud integration\n• Fast delivery directly to your order ticket",
-    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Google_Gemini_logo.svg/512px-Google_Gemini_logo.svg.png"
+    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Google_Gemini_logo.svg/512px-Google_Gemini_logo.svg.png",
+    "localLogo": "gemini.svg"
   },
   {
     "id": "gemini_pro",
@@ -75,7 +80,8 @@
     "warranty": "🛡️ 30 Days Full Warranty",
     "inStock": true,
     "description": "• Google Gemini 1.5 Pro with 1M context window\n• Deep research, coding, document & video analysis\n• Integrated with Google Workspace apps",
-    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Google_Gemini_logo.svg/512px-Google_Gemini_logo.svg.png"
+    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Google_Gemini_logo.svg/512px-Google_Gemini_logo.svg.png",
+    "localLogo": "gemini.svg"
   },
   {
     "id": "notion_business_3m",
@@ -88,7 +94,8 @@
     "warranty": "🛡️ Coupon Activation Warranty",
     "inStock": true,
     "description": "• 3 Months Notion Business plan coupon\n• Unlimited blocks, file uploads, collaborative workspaces & advanced permissions\n• Redeem directly on your Notion workspace",
-    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/Notion-logo.svg/512px-Notion-logo.svg.png"
+    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/Notion-logo.svg/512px-Notion-logo.svg.png",
+    "localLogo": "notion.svg"
   },
   {
     "id": "chatgpt_go_3m",
@@ -101,7 +108,8 @@
     "warranty": "🛡️ 5 Days Warranty (5DW)",
     "inStock": true,
     "description": "• 3 Months full account access with ChatGPT Plus capabilities\n• GPT-4o, image generation, voice mode & fast responses\n• 5 Days replacement warranty included",
-    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/ChatGPT_logo.svg/512px-ChatGPT_logo.svg.png"
+    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/ChatGPT_logo.svg/512px-ChatGPT_logo.svg.png",
+    "localLogo": "chatgpt.svg"
   },
   {
     "id": "chatgpt_plus",
@@ -114,7 +122,8 @@
     "warranty": "🛡️ 30 Days Replacement Warranty",
     "inStock": true,
     "description": "• Full access to GPT-4o, DALL-E 3 image generation\n• Advanced Data Analysis, Canvas & Voice Mode\n• Fast response speed with no queue limits",
-    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/ChatGPT_logo.svg/512px-ChatGPT_logo.svg.png"
+    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/ChatGPT_logo.svg/512px-ChatGPT_logo.svg.png",
+    "localLogo": "chatgpt.svg"
   },
   {
     "id": "capcut_pro_1m",
@@ -127,7 +136,8 @@
     "warranty": "🛡️ 30 Days Full Warranty (30DW)",
     "inStock": true,
     "description": "• CapCut Pro 1 Month full premium video editor access\n• All VIP effects, AI video tools, auto-captions & 4K 60fps export\n• 30 Days full replacement warranty guarantee",
-    "logo": "https://cdn.iconscout.com/icon/free/png-256/free-capcut-logo-icon-download-in-svg-png-gif-file-formats--editing-video-editor-apps-pack-logos-icons-6601618.png"
+    "logo": "https://cdn.iconscout.com/icon/free/png-256/free-capcut-logo-icon-download-in-svg-png-gif-file-formats--editing-video-editor-apps-pack-logos-icons-6601618.png",
+    "localLogo": "capcut.svg"
   },
   {
     "id": "canva_pro_1m",
@@ -140,7 +150,8 @@
     "warranty": "🛡️ 1 Month Full Warranty",
     "inStock": true,
     "description": "• 100M+ premium graphics, photos, videos & audio\n• Magic Studio AI design tools & Brand Kit\n• Activated directly on your personal email",
-    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/Canva_icon_2021.svg/512px-Canva_icon_2021.svg.png"
+    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/Canva_icon_2021.svg/512px-Canva_icon_2021.svg.png",
+    "localLogo": "canva.svg"
   },
   {
     "id": "spotify_3m",
@@ -153,7 +164,8 @@
     "warranty": "🛡️ Activation Warranty",
     "inStock": true,
     "description": "• 3 Months Spotify Premium coupon link\n• Ad-free listening, offline song downloads & ultra high-quality audio\n• Works seamlessly on Mobile, Desktop, and Smart TVs",
-    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/Spotify_logo_without_text.svg/512px-Spotify_logo_without_text.svg.png"
+    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/Spotify_logo_without_text.svg/512px-Spotify_logo_without_text.svg.png",
+    "localLogo": "spotify.svg"
   },
   {
     "id": "claude_100_api",
@@ -166,7 +178,8 @@
     "warranty": "🛡️ 10 Days Full Warranty (FW 10D)",
     "inStock": true,
     "description": "• Anthropic Claude $100 API preloaded credit balance (30 days validity)\n• Access Claude 3.5 Sonnet, Claude 3 Opus & Haiku\n• 10 Days replacement warranty guarantee",
-    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Claude_AI_logo.svg/512px-Claude_AI_logo.svg.png"
+    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Claude_AI_logo.svg/512px-Claude_AI_logo.svg.png",
+    "localLogo": "claude.png"
   },
   {
     "id": "claude_500_api",
@@ -179,7 +192,8 @@
     "warranty": "🛡️ 10 Days Warranty (10DW)",
     "inStock": true,
     "description": "• Anthropic Claude $500 API preloaded credit balance (30 days validity)\n• High token throughput for apps, bots & coding agents\n• 10 Days replacement warranty guarantee",
-    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Claude_AI_logo.svg/512px-Claude_AI_logo.svg.png"
+    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Claude_AI_logo.svg/512px-Claude_AI_logo.svg.png",
+    "localLogo": "claude.png"
   },
   {
     "id": "youtube_premium_3m",
@@ -192,7 +206,8 @@
     "warranty": "🛡️ Activation Warranty",
     "inStock": true,
     "description": "• YouTube Premium 3 Months activation link\n• Ad-free YouTube & YouTube Music, background play & downloads\n• Activated safely on your personal account",
-    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/YouTube_full-color_icon_%282017%29.svg/512px-YouTube_full-color_icon_%282017%29.svg.png"
+    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/YouTube_full-color_icon_%282017%29.svg/512px-YouTube_full-color_icon_%282017%29.svg.png",
+    "localLogo": "youtube.svg"
   },
   {
     "id": "youtube_family_6m",
@@ -205,7 +220,8 @@
     "warranty": "🛡️ Full Warranty (FW 6 Months)",
     "inStock": true,
     "description": "• YouTube Premium Family 6 Months plan\n• Shareable with up to 5 family members / devices\n• Full warranty covered for the complete 6 month duration",
-    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/YouTube_full-color_icon_%282017%29.svg/512px-YouTube_full-color_icon_%282017%29.svg.png"
+    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/YouTube_full-color_icon_%282017%29.svg/512px-YouTube_full-color_icon_%282017%29.svg.png",
+    "localLogo": "youtube.svg"
   },
   {
     "id": "yt_watch_hours_3h",
@@ -218,7 +234,8 @@
     "warranty": "🛡️ Non-Drop Safe Retention",
     "inStock": true,
     "description": "• Real organic high-retention watch time boost\n• 100% safe for monetization eligibility\n• Just provide your video URL in the ticket",
-    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/YouTube_full-color_icon_%282017%29.svg/512px-YouTube_full-color_icon_%282017%29.svg.png"
+    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/YouTube_full-color_icon_%282017%29.svg/512px-YouTube_full-color_icon_%282017%29.svg.png",
+    "localLogo": "youtube.svg"
   },
   {
     "id": "grok_cursor_1m",
@@ -231,7 +248,8 @@
     "warranty": "🛡️ 25 Days Warranty (25DW)",
     "inStock": true,
     "description": "• xAI Grok + Cursor Pro/Premium AI Code Editor combo\n• Unlimited fast completions, Claude 3.5 Sonnet & GPT-4o models\n• 25 Days replacement warranty guarantee",
-    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/X_logo_2023_%28white%29.png/512px-X_logo_2023_%28white%29.png"
+    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/X_logo_2023_%28white%29.png/512px-X_logo_2023_%28white%29.png",
+    "localLogo": "x.svg"
   },
   {
     "id": "netflix_1yr_prem",
@@ -244,7 +262,8 @@
     "warranty": "🛡️ 1 Year Full Warranty (FW)",
     "inStock": true,
     "description": "• Netflix Premium 4K Ultra HD 1 Year access\n• Spatial audio, downloads & multi-language support\n• 100% Full replacement warranty for all 12 months",
-    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/Netflix_icon.svg/512px-Netflix_icon.svg.png"
+    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/Netflix_icon.svg/512px-Netflix_icon.svg.png",
+    "localLogo": "netflix.svg"
   },
   {
     "id": "netflix_1m_shared",
@@ -257,6 +276,7 @@
     "warranty": "🛡️ 1 Week Warranty (1w)",
     "inStock": true,
     "description": "• Netflix Premium 4K UHD 1 Month shared profile\n• PIN-protected personal screen with custom watchlist\n• 1 Week replacement warranty",
-    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/Netflix_icon.svg/512px-Netflix_icon.svg.png"
+    "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/Netflix_icon.svg/512px-Netflix_icon.svg.png",
+    "localLogo": "netflix.svg"
   }
 ]
