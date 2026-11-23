@@ -3912,51 +3912,91 @@ async function setupStoreMenuPanel() {
 async function handleStoreSelect(interaction) {
   if (interaction.customId === 'store_select_product' || interaction.customId === 'store_select_order_direct') {
     const productId = interaction.values[0];
-    const products = getProducts();
-    const product = products.find(p => p.id === productId);
-
-    if (!product) {
-      return interaction.reply({ content: '❌ Product not found.', flags: 64 });
-    }
-
-    const productEmbed = new EmbedBuilder()
-      .setColor(0x10B981)
-      .setTitle(`${product.categoryEmoji || '🛍️'} ${product.name}`)
-      .setDescription(
-        `📂 **Category:** \`${product.category}\`\n\n` +
-        `💰 **Price (LKR):** **${product.priceLKR}**\n` +
-        `💵 **Price (USD / Crypto):** **${product.priceUSD}**\n` +
-        `⏱️ **Delivery Speed:** \`${product.delivery}\`\n` +
-        `🛡️ **Warranty:** \`${product.warranty}\`\n` +
-        `📦 **Availability:** ${product.inStock ? '🟢 **In Stock (Ready to Deliver)**' : '🔴 **Out of Stock**'}\n\n` +
-        '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
-        `**📝 Product Highlights:**\n${product.description}\n\n` +
-        '👇 *Click "🛒 Buy / Order Now" below to open your instant private order ticket!*'
-      )
-      .setFooter({ text: `Product ID: ${product.id} • NISHU STORE` });
-
-    if (product.image) {
-      productEmbed.setImage(product.image);
-    }
-
-    const btnRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`store_btn_buy_${product.id}`)
-        .setLabel('🛒 Order / Buy Now')
-        .setStyle(ButtonStyle.Success)
-        .setDisabled(!product.inStock),
-      new ButtonBuilder()
-        .setLabel('💳 Payment Methods')
-        .setStyle(ButtonStyle.Link)
-        .setURL('https://discord.com/channels/' + interaction.guild.id + '/1566962312512933968')
-    );
-
-    return interaction.reply({
-      embeds: [productEmbed],
-      components: [btnRow],
-      flags: 64
-    });
+    return showProductOverviewCard(interaction, productId);
   }
+}
+
+// Display Beautiful Product Canvas/Card with Official Brand Logo & Buttons
+async function showProductOverviewCard(interaction, productId) {
+  const products = getProducts();
+  const product = products.find(p => p.id === productId);
+
+  if (!product) {
+    const replyOptions = { content: '❌ Product not found.', flags: 64 };
+    return interaction.replied || interaction.deferred 
+      ? interaction.followUp(replyOptions) 
+      : interaction.reply(replyOptions);
+  }
+
+  const categoryColors = {
+    'VPN & Internet': 0x3B82F6,
+    'VPN & Privacy': 0x3B82F6,
+    'AI & Productivity': 0x10B981,
+    'AI & Developer Tools': 0x6366F1,
+    'Streaming & Entertainment': 0xEF4444,
+    'Creative & Design': 0xEC4899,
+    'Social Media Growth': 0xEC4899,
+    'Music & Audio': 0x1DB954
+  };
+
+  const cardColor = categoryColors[product.category] || 0x8B5CF6;
+
+  const cardEmbed = new EmbedBuilder()
+    .setColor(cardColor)
+    .setTitle(`${product.categoryEmoji || '🛍️'} ${product.name}`)
+    .setDescription(
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `📦 **PRODUCT OVERVIEW & SPECIFICATIONS**\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `🏷️ **Product Name:** **${product.name}**\n` +
+      `📂 **Category:** \`${product.category}\`\n\n` +
+      `💰 **Price (LKR):** **${product.priceLKR}**\n` +
+      `💵 **Price (USD / Crypto):** **${product.priceUSD}**\n` +
+      `🛡️ **Warranty Period:** \`${product.warranty}\`\n` +
+      `⏱️ **Delivery Speed:** \`${product.delivery}\`\n` +
+      `📦 **Stock Status:** ${product.inStock ? '🟢 **In Stock & Instant Ready**' : '🔴 **Temporarily Out of Stock**'}\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `**✨ FEATURES & BENEFITS:**\n${product.description}\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🛡️ **NISHU STORE GUARANTEE & CREDITS:**\n` +
+      `• Verified Official Genuine Licenses / Subscriptions\n` +
+      `• 100% Replacement Warranty & Anti-Revoke Protection\n` +
+      `• 24/7 Dedicated Priority Technical Support\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `👇 *Choose an option below to buy or ask tech questions:*`
+    )
+    .setFooter({ text: `NISHU STORE • Product ID: ${product.id} • Official Genuine Store` })
+    .setTimestamp();
+
+  if (product.logo) {
+    cardEmbed.setThumbnail(product.logo);
+  }
+
+  if (product.image) {
+    cardEmbed.setImage(product.image);
+  }
+
+  const actionRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`store_action_order_${product.id}`)
+      .setLabel('🛒 Buy Now (Create Ticket)')
+      .setStyle(ButtonStyle.Success)
+      .setDisabled(!product.inStock),
+    new ButtonBuilder()
+      .setCustomId(`store_action_support_${product.id}`)
+      .setLabel('🛠️ Tech Support / Questions')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setLabel('💳 Payment Methods')
+      .setStyle(ButtonStyle.Link)
+      .setURL('https://discord.com/channels/' + (interaction.guild ? interaction.guild.id : '1566956709115728083') + '/1566962312512933968')
+  );
+
+  return interaction.reply({
+    embeds: [cardEmbed],
+    components: [actionRow],
+    flags: 64
+  });
 }
 
 async function handleStoreButton(interaction) {
@@ -4003,17 +4043,129 @@ async function handleStoreButton(interaction) {
     const row = new ActionRowBuilder().addComponents(selectMenu);
 
     return interaction.reply({
-      content: '👇 **Choose which product you would like to buy to open your private order channel:**',
+      content: '👇 **Choose which product you would like to inspect or buy:**',
       components: [row],
       flags: 64
     });
   }
 
+  // When clicking any product button in #store-menu: Show the Beautiful Product Card / Canvas first!
   if (interaction.customId.startsWith('store_btn_buy_')) {
+    const productId = interaction.customId.replace('store_btn_buy_', '');
+    return showProductOverviewCard(interaction, productId);
+  }
 
+  // When clicking Tech Support button on the Product Card
+  if (interaction.customId.startsWith('store_action_support_')) {
     await interaction.deferReply({ flags: 64 });
 
-    const productId = interaction.customId.replace('store_btn_buy_', '');
+    const productId = interaction.customId.replace('store_action_support_', '');
+    const products = getProducts();
+    const product = products.find(p => p.id === productId);
+
+    const guild = interaction.guild;
+    const user = interaction.user;
+
+    const existingChannel = guild.channels.cache.find(c => 
+      c.parentId === TICKET_CATEGORY_ID && 
+      c.topic && 
+      c.topic.includes(user.id)
+    );
+
+    if (existingChannel) {
+      return interaction.editReply({
+        content: `⚠️ You already have an open ticket in ${existingChannel}! Please ask your questions there.`
+      });
+    }
+
+    const prodShortName = product ? product.name.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 10) : 'support';
+    const channelName = `🛠️・tech-${prodShortName}-${user.username.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8)}`;
+
+    try {
+      const supportChannel = await guild.channels.create({
+        name: channelName,
+        type: ChannelType.GuildText,
+        parent: TICKET_CATEGORY_ID,
+        topic: `Customer: ${user.tag} (${user.id}) | Tech Support: ${product ? product.name : 'Inquiry'}`,
+        permissionOverwrites: [
+          {
+            id: guild.roles.everyone.id,
+            deny: [PermissionFlagsBits.ViewChannel]
+          },
+          {
+            id: user.id,
+            allow: [
+              PermissionFlagsBits.ViewChannel,
+              PermissionFlagsBits.SendMessages,
+              PermissionFlagsBits.AttachFiles,
+              PermissionFlagsBits.ReadMessageHistory
+            ]
+          },
+          ...STAFF_ROLE_IDS.map(roleId => ({
+            id: roleId,
+            allow: [
+              PermissionFlagsBits.ViewChannel,
+              PermissionFlagsBits.SendMessages,
+              PermissionFlagsBits.AttachFiles,
+              PermissionFlagsBits.ReadMessageHistory
+            ]
+          }))
+        ]
+      });
+
+      const staffPings = STAFF_ROLE_IDS.map(id => `<@&${id}>`).join(' ');
+
+      const supportEmbed = new EmbedBuilder()
+        .setColor(0x3B82F6)
+        .setTitle('🛠️ TECH SUPPORT TICKET // NISHU STORE')
+        .setDescription(
+          `👋 Welcome ${user}! Our technical support team is here to assist you.\n\n` +
+          `📦 **Product of Interest:** **${product ? product.name : 'Store Inquiry'}**\n` +
+          `🛡️ **Warranty Coverage:** \`${product ? product.warranty : 'Standard Support'}\`\n\n` +
+          '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+          '💬 **How can we help you?**\n' +
+          'Please describe your questions, technical requirements, or concerns below.\n' +
+          'Our staff will respond shortly!'
+        )
+        .setFooter({ text: 'NISHU STORE • 24/7 Tech Support Desk' })
+        .setTimestamp();
+
+      if (product && product.logo) {
+        supportEmbed.setThumbnail(product.logo);
+      }
+
+      const controlRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`store_action_order_${product ? product.id : ''}`)
+          .setLabel('🛒 Switch to Buy Now')
+          .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+          .setCustomId('ticket_close')
+          .setLabel('Close Ticket')
+          .setEmoji('🔒')
+          .setStyle(ButtonStyle.Danger)
+      );
+
+      await supportChannel.send({
+        content: `👋 Hey ${user}! ${staffPings} A customer requested technical support!`,
+        embeds: [supportEmbed],
+        components: [controlRow]
+      });
+
+      return interaction.editReply({
+        content: `✅ **Your Tech Support ticket has been created:** ${supportChannel}! Please click to chat with our staff.`
+      });
+    } catch (err) {
+      console.error('Error creating support ticket:', err);
+      return interaction.editReply({ content: '❌ Failed to create support ticket: ' + err.message });
+    }
+  }
+
+  // When clicking Buy Now button on the Product Card
+  if (interaction.customId.startsWith('store_action_order_')) {
+    await interaction.deferReply({ flags: 64 });
+
+    const productId = interaction.customId.replace('store_action_order_', '');
     const products = getProducts();
     const product = products.find(p => p.id === productId);
 
@@ -4094,6 +4246,10 @@ async function handleStoreButton(interaction) {
         )
         .setFooter({ text: 'NISHU STORE • Fast & Reliable Digital Delivery' })
         .setTimestamp();
+
+      if (product && product.logo) {
+        orderEmbed.setThumbnail(product.logo);
+      }
 
       const orderRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
