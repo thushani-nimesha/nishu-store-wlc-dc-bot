@@ -5008,8 +5008,14 @@ client.on('messageCreate', async (message) => {
     if (!message.guild || message.author.bot) return;
 
     // A. DETECT PAYMENT SLIP UPLOAD IN ORDER / SUPPORT TICKETS
-    if (message.channel.parentId === TICKET_CATEGORY_ID && message.attachments.size > 0) {
-      const isImage = message.attachments.some(a => a.contentType && a.contentType.startsWith('image/'));
+    const isTicket = (message.channel.parentId === TICKET_CATEGORY_ID) || 
+      (message.channel.name && (message.channel.name.startsWith('🛒・') || message.channel.name.startsWith('🛠️・') || message.channel.name.startsWith('ticket-') || message.channel.name.startsWith('order-')));
+
+    if (isTicket && message.attachments.size > 0) {
+      const isImage = message.attachments.some(a => 
+        (a.contentType && a.contentType.startsWith('image/')) ||
+        /\.(png|jpe?g|webp|gif|bmp|heic)$/i.test(a.name || '')
+      );
       if (isImage) {
         await handlePaymentSlipUpload(message);
         return; // Processed as payment slip, skip automod
@@ -5633,7 +5639,10 @@ async function handleStaffCommand(interaction) {
 
 async function handlePaymentSlipUpload(message) {
   try {
-    const slipAttachment = message.attachments.find(a => a.contentType && a.contentType.startsWith('image/'));
+    const slipAttachment = message.attachments.find(a => 
+      (a.contentType && a.contentType.startsWith('image/')) ||
+      /\.(png|jpe?g|webp|gif|bmp|heic)$/i.test(a.name || '')
+    );
     if (!slipAttachment) return;
 
     const guild = message.guild;
@@ -5643,6 +5652,9 @@ async function handlePaymentSlipUpload(message) {
     // React to slip upload
     await message.react('🧾').catch(() => {});
     await message.react('⏳').catch(() => {});
+
+    // Ensure member cache is populated
+    await guild.members.fetch().catch(() => {});
 
     // Find Finance Managers Role
     const financeRole = guild.roles.cache.find(r => 
@@ -5685,37 +5697,54 @@ async function handlePaymentSlipUpload(message) {
       components: [actionRow]
     });
 
-    // Send direct Private DM to every member who has the Finance Role
+    // Send direct Private DM to Finance Role members, Store Managers, Admins, and Owner
     try {
-      if (financeRole) {
-        // Fetch members to ensure full cache
-        await guild.members.fetch();
-        const financeMembers = financeRole.members;
-        
-        const dmFinanceEmbed = new EmbedBuilder()
-          .setColor(0xF59E0B)
-          .setTitle('🚨 NEW PAYMENT SLIP TO VERIFY // NISHU STORE')
-          .setDescription(
-            `Hey Finance Team! Customer ${customer} (\`${customer.tag}\`) just uploaded a payment slip.\n\n` +
-            `💬 **Ticket Channel:** ${ticketChannel.name} (<#${ticketChannel.id}>)\n` +
-            `👤 **Customer ID:** \`${customer.id}\`\n\n` +
-            `👉 You can approve or reject directly from this DM or from the ticket channel!`
-          )
-          .setImage(slipAttachment.url)
-          .setFooter({ text: 'NISHU STORE • Finance Alert' })
-          .setTimestamp();
+      const targetMembers = new Map();
 
-        for (const [_, member] of financeMembers) {
-          if (!member.user.bot) {
-            await member.send({
-              embeds: [dmFinanceEmbed],
-              components: [actionRow]
-            }).catch(e => console.warn(`Could not send DM to finance member ${member.user.tag}:`, e.message));
-          }
+      // 1. Members with Finance Role
+      if (financeRole) {
+        financeRole.members.forEach(m => {
+          if (!m.user.bot) targetMembers.set(m.id, m);
+        });
+      }
+
+      // 2. Members with staff roles (Owner, Store Manager, Admin)
+      for (const roleId of STAFF_ROLE_IDS) {
+        const role = guild.roles.cache.get(roleId);
+        if (role) {
+          role.members.forEach(m => {
+            if (!m.user.bot) targetMembers.set(m.id, m);
+          });
         }
       }
+
+      // 3. Guild Owner
+      const owner = await guild.fetchOwner().catch(() => null);
+      if (owner && !owner.user.bot) {
+        targetMembers.set(owner.id, owner);
+      }
+
+      const dmFinanceEmbed = new EmbedBuilder()
+        .setColor(0xF59E0B)
+        .setTitle('🚨 NEW PAYMENT SLIP TO VERIFY // NISHU STORE')
+        .setDescription(
+          `Hey Finance Team! Customer ${customer} (\`${customer.tag}\`) just uploaded a payment slip.\n\n` +
+          `💬 **Ticket Channel:** ${ticketChannel.name} (<#${ticketChannel.id}>)\n` +
+          `👤 **Customer ID:** \`${customer.id}\`\n\n` +
+          `👉 You can approve or reject directly from this DM or from the ticket channel!`
+        )
+        .setImage(slipAttachment.url)
+        .setFooter({ text: 'NISHU STORE • Finance Alert' })
+        .setTimestamp();
+
+      for (const [, member] of targetMembers) {
+        await member.send({
+          embeds: [dmFinanceEmbed],
+          components: [actionRow]
+        }).catch(e => console.warn(`Could not send DM to staff/finance member ${member.user.tag}:`, e.message));
+      }
     } catch (dmErr) {
-      console.warn('Error sending DM to finance role members:', dmErr.message);
+      console.warn('Error sending DM to finance/staff members:', dmErr.message);
     }
   } catch (err) {
     console.error('Error handling payment slip upload:', err);
