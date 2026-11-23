@@ -3981,14 +3981,15 @@ function generateProductBannerCanvas(product) {
 
 // Display Beautiful Product Canvas/Card with Official Brand Logo & Buttons
 async function showProductOverviewCard(interaction, productId) {
+  if (!interaction.deferred && !interaction.replied) {
+    await interaction.deferReply({ flags: 64 }).catch(() => {});
+  }
+
   const products = getProducts();
   const product = products.find(p => p.id === productId);
 
   if (!product) {
-    const replyOptions = { content: '❌ Product not found.', flags: 64 };
-    return interaction.replied || interaction.deferred 
-      ? interaction.followUp(replyOptions) 
-      : interaction.reply(replyOptions);
+    return interaction.editReply({ content: '❌ Product not found.' });
   }
 
   const categoryColors = {
@@ -4052,11 +4053,10 @@ async function showProductOverviewCard(interaction, productId) {
       .setURL('https://discord.com/channels/' + (interaction.guild ? interaction.guild.id : '1566956709115728083') + '/1566962312512933968')
   );
 
-  return interaction.reply({
+  return interaction.editReply({
     embeds: [cardEmbed],
     components: [actionRow],
-    files: [bannerAttachment],
-    flags: 64
+    files: [bannerAttachment]
   });
 }
 
