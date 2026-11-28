@@ -815,25 +815,25 @@ const client = new Client({
 // Configure Lavalink v4 nodes cluster with auto-failover
 const lavalinkNodes = [
   {
+    host: "lavalinkv4.serenetia.com",
+    port: 443,
+    password: "https://seretia.link/discord",
+    secure: true,
+    name: "Serenetia-Node-1"
+  },
+  {
+    host: "lavalink.serenetia.com",
+    port: 443,
+    password: "https://dsc.gg/ajidevserver",
+    secure: true,
+    name: "Serenetia-Node-2"
+  },
+  {
     host: "127.0.0.1",
     port: 2333,
     password: "youshallnotpass",
     secure: false,
     name: "Localhost-Private-0ms"
-  },
-  {
-    host: "lavalink.nazha.online",
-    port: 443,
-    password: "nazhafreelava",
-    secure: true,
-    name: "Nazha-Node-Online"
-  },
-  {
-    host: "lavalinkv4.serenetia.com",
-    port: 443,
-    password: "https://seretia.link/discord",
-    secure: true,
-    name: "Serenetia-Node-Online"
   }
 ];
 
@@ -852,7 +852,7 @@ function createRiffyForClient(targetClient) {
       const guild = targetClient.guilds.cache.get(payload.d.guild_id);
       if (guild) guild.shard.send(payload);
     },
-    defaultSearchPlatform: "dzsearch",
+    defaultSearchPlatform: "spsearch",
     restVersion: "v4"
   });
 
@@ -871,15 +871,15 @@ function createRiffyForClient(targetClient) {
   riffy.on("trackError", async (player, track, error) => {
     console.error(`❌ Track playback error for "${track?.info?.title}":`, error?.message || error);
     
-    // Auto-retry via Deezer HQ stream if original stream failed
+    // Auto-retry via SoundCloud stream if original stream failed
     if (!track._fallbackRetried && track?.info?.title) {
       track._fallbackRetried = true;
       try {
-        console.log(`🔄 Auto-recovering "${track.info.title}" via Deezer CD-Quality stream...`);
+        console.log(`🔄 Auto-recovering "${track.info.title}" via SoundCloud High-Fidelity stream...`);
         const searchTerms = track.info.title + (track.info.author ? ' ' + track.info.author : '');
         const fallbackRes = await targetClient.riffy.resolve({
           query: searchTerms,
-          source: 'dzsearch',
+          source: 'scsearch',
           requester: track.info.requester
         }).catch(() => null);
 
@@ -890,7 +890,7 @@ function createRiffyForClient(targetClient) {
           return player.play().catch(() => {});
         }
       } catch (fbErr) {
-        console.warn('Deezer fallback stream failed:', fbErr.message);
+        console.warn('SoundCloud fallback stream failed:', fbErr.message);
       }
     }
 
@@ -6453,17 +6453,29 @@ async function handleMusicPlayCommand(interaction) {
         }
       }
     } else {
-      // Query search: Prioritize Deezer 320kbps (Zero YouTube bot-block drops, flawless audio)
+      // Query search: Prioritize Spotify High-Quality Search
       resolveRes = await selectedClient.riffy.resolve({
         query: query,
-        source: 'dzsearch',
+        source: 'spsearch',
         requester: interaction.user.id
       }).catch(err => {
-        console.warn('Deezer resolve error:', err.message);
+        console.warn('Spotify resolve error:', err.message);
         return null;
       });
 
-      // Fallback 1: YouTube Music
+      // Fallback 1: SoundCloud (High Reliability & Fast)
+      if (!resolveRes || !resolveRes.tracks || resolveRes.tracks.length === 0 || resolveRes.loadType === 'empty') {
+        resolveRes = await selectedClient.riffy.resolve({
+          query: query,
+          source: 'scsearch',
+          requester: interaction.user.id
+        }).catch(err => {
+          console.warn('SoundCloud resolve error:', err.message);
+          return null;
+        });
+      }
+
+      // Fallback 2: YouTube Music
       if (!resolveRes || !resolveRes.tracks || resolveRes.tracks.length === 0 || resolveRes.loadType === 'empty') {
         resolveRes = await selectedClient.riffy.resolve({
           query: query,
@@ -6475,7 +6487,7 @@ async function handleMusicPlayCommand(interaction) {
         });
       }
 
-      // Fallback 2: Standard YouTube
+      // Fallback 3: Standard YouTube
       if (!resolveRes || !resolveRes.tracks || resolveRes.tracks.length === 0 || resolveRes.loadType === 'empty') {
         resolveRes = await selectedClient.riffy.resolve({
           query: query,
